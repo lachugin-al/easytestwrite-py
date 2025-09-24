@@ -11,10 +11,10 @@ app = typer.Typer(add_completion=False)
 
 @app.command()
 def run(
-        config: str = typer.Option(None, help="Path to YAML config"),
-        platform: str = typer.Option(None, help="android|ios"),
-        tests_path: str = typer.Option("tests", help="Path to tests to run"),
-        extra: str = typer.Option("", help="Extra pytest arguments (space-separated)"),
+    config: str = typer.Option(None, help="Path to YAML config"),
+    platform: str = typer.Option(None, help="android|ios"),
+    tests_path: str = typer.Option("tests", help="Path to tests to run"),
+    extra: str = typer.Option("", help="Extra pytest arguments (space-separated)"),
 ) -> Any:
     """
     Run pytest with optional configuration and platform overrides.

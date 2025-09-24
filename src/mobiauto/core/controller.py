@@ -36,11 +36,11 @@ class MobileController:
         el.click()
 
     def type(
-            self,
-            target: PageElement | StrategyValue,
-            text: str,
-            clear: bool = True,
-            **params: Any,
+        self,
+        target: PageElement | StrategyValue,
+        text: str,
+        clear: bool = True,
+        **params: Any,
     ) -> None:
         """
         Wait for the element and type the given text into it.

@@ -42,7 +42,7 @@ class DummyDrv:
 
 
 def test_controller_click_delegates_to_waits_and_clicks(
-        monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """
     Ensure MobileController.click delegates to Waits.wait_for_elements,

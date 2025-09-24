@@ -2,7 +2,7 @@
 name = "mobile-automation"
 version = "0.1.0"
 description = "Mobile app automation: pytest + Appium v3"
-authors = ["<anton.lachugin.l@gmail.com>"]
+authors = ["Anton Lachugin<anton.lachugin.l@gmail.com>"]
 packages = [{ include = "mobiauto", from = "src" }]
 
 [tool.poetry.dependencies]

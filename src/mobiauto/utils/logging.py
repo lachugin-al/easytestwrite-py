@@ -12,8 +12,8 @@ def setup_logging() -> None:
     """
     structlog.configure(
         processors=[
-            structlog.processors.add_log_level,           # Include log level in output
-            structlog.processors.TimeStamper(fmt="iso"), # Add timestamp in ISO 8601 format
-            structlog.processors.JSONRenderer(),         # Render logs as JSON
+            structlog.processors.add_log_level,  # Include log level in output
+            structlog.processors.TimeStamper(fmt="iso"),  # Add timestamp in ISO 8601 format
+            structlog.processors.JSONRenderer(),  # Render logs as JSON
         ]
     )

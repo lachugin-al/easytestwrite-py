@@ -10,7 +10,7 @@ from mobiauto.config.models import Settings
 
 
 def test_load_settings_yaml_and_env_override(
-        tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """
     Test that settings are correctly loaded from a YAML file

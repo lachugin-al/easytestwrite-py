@@ -30,16 +30,16 @@ class Waits:
 
     @staticmethod
     def wait_for_elements(
-            driver: WebDriver,
-            target: PageElement | StrategyValue,
-            *,
-            index: int | None = None,
-            settle_for: float = DEFAULT_TIMEOUT_BEFORE_EXPECTATION,
-            timeout: float = DEFAULT_TIMEOUT_EXPECTATION,
-            polling_ms: int = DEFAULT_POLLING_INTERVAL_MS,
-            max_scrolls: int = DEFAULT_SCROLL_COUNT,
-            scroll_percent: float = DEFAULT_SCROLL_CAPACITY,
-            scroll_direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
+        driver: WebDriver,
+        target: PageElement | StrategyValue,
+        *,
+        index: int | None = None,
+        settle_for: float = DEFAULT_TIMEOUT_BEFORE_EXPECTATION,
+        timeout: float = DEFAULT_TIMEOUT_EXPECTATION,
+        polling_ms: int = DEFAULT_POLLING_INTERVAL_MS,
+        max_scrolls: int = DEFAULT_SCROLL_COUNT,
+        scroll_percent: float = DEFAULT_SCROLL_CAPACITY,
+        scroll_direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
     ) -> WebElement:
         """
         Wait for a visible element and return the N-th visible one (1-based index).
@@ -121,16 +121,16 @@ class Waits:
 
     @staticmethod
     def wait_for_element_or_none(
-            driver: WebDriver,
-            target: PageElement | StrategyValue,
-            *,
-            index: int | None = None,
-            settle_for: float = DEFAULT_TIMEOUT_BEFORE_EXPECTATION,
-            timeout: float = DEFAULT_TIMEOUT_EXPECTATION,
-            polling_ms: int = DEFAULT_POLLING_INTERVAL_MS,
-            max_scrolls: int = DEFAULT_SCROLL_COUNT,
-            scroll_percent: float = DEFAULT_SCROLL_CAPACITY,
-            scroll_direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
+        driver: WebDriver,
+        target: PageElement | StrategyValue,
+        *,
+        index: int | None = None,
+        settle_for: float = DEFAULT_TIMEOUT_BEFORE_EXPECTATION,
+        timeout: float = DEFAULT_TIMEOUT_EXPECTATION,
+        polling_ms: int = DEFAULT_POLLING_INTERVAL_MS,
+        max_scrolls: int = DEFAULT_SCROLL_COUNT,
+        scroll_percent: float = DEFAULT_SCROLL_CAPACITY,
+        scroll_direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
     ) -> WebElement | None:
         """
         Same as wait_for_elements, but returns None instead of raising an exception.
@@ -158,7 +158,7 @@ class Waits:
 
 # ---- Internal helper functions ----
 def _nth_visible_condition(
-        t: StrategyValue, n: int
+    t: StrategyValue, n: int
 ) -> Callable[[WebDriver], list[WebElement] | bool]:
     """
     Create a function for WebDriverWait.until that returns a list of visible elements
@@ -189,6 +189,7 @@ def _any_visible(tuples: Sequence[StrategyValue]) -> Callable[[WebDriver], WebEl
     Return a predicate function that finds and returns the first visible element
     among the provided locators, or False if none are visible.
     """
+
     def _predicate(driver: WebDriver) -> WebElement | bool:
         for by, value in tuples:
             try:
@@ -221,10 +222,10 @@ def _wait_for_ui_stability(driver: WebDriver, timeout_seconds: float, polling_ms
 
 
 def _perform_scroll(
-        driver: WebDriver,
-        count: int = 1,
-        capacity: float = DEFAULT_SCROLL_CAPACITY,
-        direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
+    driver: WebDriver,
+    count: int = 1,
+    capacity: float = DEFAULT_SCROLL_CAPACITY,
+    direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
 ) -> None:
     """
     Perform a scroll gesture using Appium's `mobile: scrollGesture` endpoint.

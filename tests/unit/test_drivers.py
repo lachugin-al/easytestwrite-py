@@ -19,6 +19,7 @@ def test_driverfactory_is_abstract() -> None:
 
 class DummyWebDriver:
     """Minimal stub exposing only quit(), to satisfy the abstract contract."""
+
     def quit(self) -> None:
         pass
 

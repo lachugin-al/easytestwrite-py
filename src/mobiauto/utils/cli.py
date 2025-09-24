@@ -30,11 +30,11 @@ class Completed:
 
 
 def run_cmd(
-        args: Sequence[str],
-        *,
-        check: bool = True,
-        spawn: bool = False,
-        timeout: int | None = None,
+    args: Sequence[str],
+    *,
+    check: bool = True,
+    spawn: bool = False,
+    timeout: int | None = None,
 ) -> Completed | subprocess.Popen:
     """
     Run a command as a subprocess.
