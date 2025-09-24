@@ -1,4 +1,3 @@
-# tests/unit/test_device.py
 from __future__ import annotations
 
 from typing import Any
@@ -10,6 +9,12 @@ from mobiauto.device.ios_simulator import IOSSimulatorManager
 
 
 def test_android_emulator_commands(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Verify that AndroidEmulatorManager issues the expected emulator/adb commands:
+    - starts the emulator
+    - polls sys.boot_completed until ready
+    - sends 'emu kill' to stop
+    """
     calls: list[tuple[tuple[str, ...], dict[str, Any]]] = []
 
     class R:
@@ -20,9 +25,9 @@ def test_android_emulator_commands(monkeypatch: pytest.MonkeyPatch) -> None:
 
     def fake_run_cmd(args: list[str], **kw: Any) -> R:
         calls.append((tuple(args), kw))
-        # emulate boot loop then ready
+        # Emulate boot loop, then ready
         if "getprop" in args:
-            # перезапись stdout последним вызовом как "1"
+            # Overwrite stdout as "1" on the second call to indicate readiness
             if len([c for c in calls if "getprop" in c[0]]) >= 2:
                 return R(0, "1")
             return R(0, "0")
@@ -35,13 +40,19 @@ def test_android_emulator_commands(monkeypatch: pytest.MonkeyPatch) -> None:
     mgr.wait_until_ready(timeout=3)
     mgr.stop()
 
-    # проверяем, что были вызваны команды emulator/adb
+    # Ensure emulator/adb commands were invoked
     assert any("emulator" in c[0][0] for c in calls)
     assert any("adb" in c[0][0] and "getprop" in c[0] for c in calls)
     assert any("emu" in c[0] and "kill" in c[0] for c in calls)
 
 
 def test_ios_simulator_commands(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Verify that IOSSimulatorManager issues the expected xcrun simctl commands:
+    - boots the simulator
+    - checks readiness via launchctl
+    - shuts down the simulator
+    """
     calls: list[tuple[str, ...]] = []
 
     class R:
@@ -52,7 +63,7 @@ def test_ios_simulator_commands(monkeypatch: pytest.MonkeyPatch) -> None:
 
     def fake_run_cmd(args: list[str], **kw: Any) -> R:
         calls.append(tuple(args))
-        # spawn system ready сразу
+        # Pretend the system is ready immediately when checking via launchctl
         if "launchctl" in args:
             return R(0)
         return R(0)

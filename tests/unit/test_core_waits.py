@@ -12,6 +12,8 @@ from mobiauto.core.waits import Waits
 
 
 class FakeEl:
+    """Simple fake element used for visibility and interaction checks."""
+
     def __init__(self, visible: bool = True) -> None:
         self._visible: bool = visible
         self.clicked: int = 0
@@ -32,6 +34,8 @@ class FakeEl:
 
 
 class FakeDriver:
+    """Minimal driver stub exposing just what Waits needs."""
+
     def __init__(self) -> None:
         self.capabilities: dict[str, str] = {"platformName": "Android"}
         self._elements_map: dict[tuple[str, str], list[FakeEl]] = {}
@@ -51,7 +55,7 @@ class FakeDriver:
 
     def execute_script(self, name: str, args: dict) -> None:
         self.exec_calls.append((name, args))
-        # эмуляция, проскроллили - страница изменилась
+        # Emulate scrolling: page content changes after a scroll
         self._page_source = self._page_source + "x"
 
     # helpers
@@ -61,14 +65,15 @@ class FakeDriver:
 
 @pytest.fixture(autouse=True)
 def fast_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
-    # ускоряем тесты: time.sleep → сразу
+    """Speed up tests: patch time.sleep to no-op."""
     monkeypatch.setattr(time, "sleep", lambda *_a, **_k: None)
 
 
 def test_waits_returns_nth_visible_element() -> None:
+    """Should return the N-th visible element (1-based index)."""
     drv = FakeDriver()
     loc = by_xpath("//a")
-    # будет 2 элемента, оба видимы
+    # Two elements, both visible
     e1, e2 = FakeEl(True), FakeEl(True)
     drv.set_elements("xpath", "//a", [e1, e2])
 
@@ -77,28 +82,30 @@ def test_waits_returns_nth_visible_element() -> None:
 
 
 def test_waits_times_out_if_not_enough_elements() -> None:
+    """Should time out when fewer than N elements are visible."""
     drv = FakeDriver()
     loc = by_xpath("//a")
-    drv.set_elements("xpath", "//a", [FakeEl(True)])  # всего 1, просим второй
+    drv.set_elements("xpath", "//a", [FakeEl(True)])  # only 1, but we request the 2nd
 
     with pytest.raises(Exception) as ei:
         Waits.wait_for_elements(cast(WebDriver, drv), loc, index=2, timeout=0.2, polling_ms=50)
-    # сообщение об ошибке информативное
+    # Error message should be informative
     assert "were not found within" in str(ei.value)
 
 
 def test_waits_scrolls_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Should perform scrolls and re-try when configured with max_scrolls > 0."""
     drv = FakeDriver()
     loc = by_xpath("//list")
-    # Сначала пусто…
+    # Initially empty…
     drv.set_elements("xpath", "//list", [])
 
-    # …после первого скролла станет 1 видимый элемент
+    # …after the first scroll one visible element appears
     def after_first_scroll_make_element_visible() -> None:
         if len(drv.exec_calls) >= 1:
             drv.set_elements("xpath", "//list", [FakeEl(True)])
 
-    # подменим execute_script, чтобы имитировать появление элемента после скролла
+    # Patch execute_script to simulate element appearance after scroll
     orig_exec = drv.execute_script
 
     def fake_exec(self: FakeDriver, name: str, args: dict) -> None:
@@ -121,6 +128,7 @@ def test_waits_scrolls_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_wait_for_element_or_none_returns_none_on_absence() -> None:
+    """wait_for_element_or_none should return None when no element is found."""
     drv = FakeDriver()
     loc = by_xpath("//missing")
     drv.set_elements("xpath", "//missing", [])

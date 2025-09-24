@@ -2,7 +2,7 @@
 name = "mobile-automation"
 version = "0.1.0"
 description = "Mobile app automation: pytest + Appium v3"
-authors = ["Anton Lachugin <anton.lachugin.l@gmail.com>"]
+authors = ["<anton.lachugin.l@gmail.com>"]
 packages = [{ include = "mobiauto", from = "src" }]
 
 [tool.poetry.dependencies]
@@ -65,14 +65,14 @@ src_paths = ["src", "tests"]
 skip = [".venv", "build", "dist", ".coverage_html"]
 
 [tool.ruff]
-# Общие настройки
+# General settings
 line-length = 100
 target-version = "py313"
 src = ["src", "tests"]
 exclude = [".venv", "build", "dist", ".coverage_html"]
 
 [tool.ruff.lint]
-# Набор правил: pyflakes/pycodestyle, isort, bugbear, модернизации, и т.п.
+# Ruleset: pyflakes/pycodestyle, isort, bugbear, modernizations, etc.
 select = [
     "E",   # pycodestyle (errors)
     "F",   # pyflakes
@@ -86,7 +86,7 @@ select = [
     "W",   # pycodestyle (warnings)
 ]
 ignore = [
-    "E501",   # длина строки контролируем Black'ом
+    "E501",   # line length is enforced by Black
 ]
 
 [tool.ruff.lint.isort]
@@ -108,17 +108,17 @@ check_untyped_defs = true
 pretty = true
 show_error_codes = true
 
-# Внешние пакеты без типингов - не валим билд
+# External packages without typings — do not fail the build
 ignore_missing_imports = true
 
-# Послабления для tests/*
+# Relaxations for tests/*
 [[tool.mypy.overrides]]
 module = ["tests.*"]
 disallow_untyped_defs = false
 check_untyped_defs = false
 
 # ------------------------------
-# Coverage (в pyproject вместо .coveragerc)
+# Coverage (in pyproject instead of .coveragerc)
 # ------------------------------
 
 [tool.coverage.run]

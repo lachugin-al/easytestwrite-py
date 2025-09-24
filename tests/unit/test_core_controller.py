@@ -9,6 +9,8 @@ from mobiauto.core.controller import MobileController
 
 
 class DummyEl:
+    """Simple stand-in for a WebElement that records interactions."""
+
     def __init__(self) -> None:
         self.clicked = False
         self.cleared = 0
@@ -25,6 +27,8 @@ class DummyEl:
 
 
 class DummyDrv:
+    """Minimal driver stub that mimics the interface used by MobileController."""
+
     def __init__(self, caps: dict[str, str] | None = None) -> None:
         self.capabilities = caps or {}
         self.back_called = 0
@@ -38,14 +42,18 @@ class DummyDrv:
 
 
 def test_controller_click_delegates_to_waits_and_clicks(
-    monkeypatch: pytest.MonkeyPatch,
+        monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """
+    Ensure MobileController.click delegates to Waits.wait_for_elements,
+    forwards keyword arguments, and clicks the returned element.
+    """
     drv = DummyDrv()
-    ctl = MobileController(cast(Any, drv))  # кастим заглушку к совместимому типу
+    ctl = MobileController(cast(Any, drv))  # cast stub to a compatible type
     dummy = DummyEl()
     received: dict[str, Any] = {}
 
-    # подменяем Waits.wait_for_elements → возвращаем наш элемент и проверяем параметры
+    # Patch Waits.wait_for_elements → return our dummy element and capture kwargs
     def fake_wait_for_elements(driver: Any, target: Any, **kw: Any) -> DummyEl:
         assert driver is drv
         received.update(kw)
@@ -60,13 +68,14 @@ def test_controller_click_delegates_to_waits_and_clicks(
     ctl.click(sentinel_target, timeout=10, index=2, polling_ms=250)
 
     assert dummy.clicked is True
-    # убеждаемся, что ключевые параметры докатились до Waits
+    # Verify key parameters reached Waits
     assert received["timeout"] == 10
     assert received["index"] == 2
     assert received["polling_ms"] == 250
 
 
 def test_controller_type_clears_and_sends(monkeypatch: pytest.MonkeyPatch) -> None:
+    """type(clear=True) should clear the element first and then send text."""
     drv = DummyDrv()
     ctl = MobileController(cast(Any, drv))
     dummy = DummyEl()
@@ -82,6 +91,7 @@ def test_controller_type_clears_and_sends(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_controller_type_without_clear(monkeypatch: pytest.MonkeyPatch) -> None:
+    """type(clear=False) should not clear the element before sending text."""
     drv = DummyDrv()
     ctl = MobileController(cast(Any, drv))
     dummy = DummyEl()

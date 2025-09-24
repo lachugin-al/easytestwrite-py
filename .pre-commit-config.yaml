@@ -1,29 +1,29 @@
 # ---- pre-commit hooks for this repo ----
-# Работают поверх наших конфигов в pyproject.toml (ruff/black/isort/mypy)
+# These run on top of our configs in pyproject.toml (ruff/black/isort/mypy)
 
 repos:
-  # Быстрый общий линтер (включая isort-правила)
+  # Fast general linter (includes isort-like import rules)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.6.9
     hooks:
       - id: ruff
-        args: [--fix]          # авточинит возможное
-      - id: ruff-format        # форматирование
+        args: [--fix]          # auto-fix where possible
+      - id: ruff-format        # formatting
 
-  # Black - детерминированное форматирование
+  # Black — deterministic code formatter
   - repo: https://github.com/psf/black
     rev: 24.10.0
     hooks:
       - id: black
 
-  # Isort - отдельно, если хотим прогонять независимо от Ruff
+  # Isort — separate run if we want it independently from Ruff
   - repo: https://github.com/PyCQA/isort
     rev: 5.13.2
     hooks:
       - id: isort
         args: ["--profile", "black"]
 
-  # Базовая гигиена репозитория
+  # Basic repository hygiene
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -35,7 +35,7 @@ repos:
       - id: check-yaml
       - id: check-toml
 
-  # Mypy - через локальный hook, чтобы запускать внутри poetry-venv
+  # Mypy — via a local hook to run inside the poetry venv
   - repo: local
     hooks:
       - id: mypy
@@ -45,7 +45,7 @@ repos:
         pass_filenames: false
         types: [python]
 
-# Глобальные исключения (опционально)
+# Global exclusions (optional)
 exclude: |
   (?x)^(
       .venv/|

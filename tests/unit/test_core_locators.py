@@ -23,8 +23,9 @@ from mobiauto.core.locators import (
 )
 
 
-# ----------------- функции by_* -----------------
+# ----------------- by_* factory functions -----------------
 def test_higher_level_builders_return_expected_strategies() -> None:
+    """Ensure each higher-level builder returns the expected strategy/value pair."""
     t = by_text("Россия")
     assert t[0] == "xpath"
     assert "//*[@text = 'Россия']" in t[1]
@@ -71,17 +72,21 @@ def test_higher_level_builders_return_expected_strategies() -> None:
     [by_text, by_name, by_value, by_label, by_contains, by_xpath, by_id, by_resource_id],
 )
 def test_builders_none_raises(func: Callable[[str | None], tuple[str, str]]) -> None:
+    """All builders must raise ValueError when called with None."""
     with pytest.raises(ValueError):
         func(None)
 
 
-# ----------------- PageElement и разрешение платформы -----------------
+# ----------------- PageElement and platform resolution -----------------
 class DummyDrv:
+    """Driver stub exposing only the 'capabilities' field used by helpers."""
+
     def __init__(self, caps: dict[str, str]) -> None:
         self.capabilities = caps
 
 
 def test_pageelement_get_and_get_all_android() -> None:
+    """For Android, get_all should return all Android locators (list first)."""
     pe = PageElement(
         android=by_text("A"),
         ios=by_name("B"),
@@ -94,6 +99,7 @@ def test_pageelement_get_and_get_all_android() -> None:
 
 
 def test_pageelement_get_and_get_all_ios() -> None:
+    """For iOS, get_all should return iOS locators list preserving order."""
     pe = PageElement(
         android=by_text("A"),
         ios=by_name("Россия"),
@@ -107,6 +113,7 @@ def test_pageelement_get_and_get_all_ios() -> None:
 
 
 def test_pageelement_missing_platform_raises() -> None:
+    """get/get_all should raise if no locator exists for the requested platform."""
     pe = PageElement(android=by_text("A"))
     with pytest.raises(ValueError):
         pe.get("ios")
@@ -115,6 +122,7 @@ def test_pageelement_missing_platform_raises() -> None:
 
 
 def test_resolve_to_selenium_accepts_plain_locator() -> None:
+    """A plain StrategyValue should be wrapped into a single-item list."""
     drv = DummyDrv({"platformName": "Android"})
     loc = by_text("A")
     tuples = resolve_to_selenium(drv, loc)
@@ -122,6 +130,7 @@ def test_resolve_to_selenium_accepts_plain_locator() -> None:
 
 
 def test_resolve_to_selenium_wrong_type_raises() -> None:
+    """Non-supported types should cause a TypeError."""
     drv = DummyDrv({"platformName": "Android"})
     with pytest.raises(TypeError):
         resolve_to_selenium(drv, "not a locator")  # type: ignore[arg-type]
@@ -137,5 +146,6 @@ def test_resolve_to_selenium_wrong_type_raises() -> None:
     ],
 )
 def test_get_platform_from_driver(caps: dict[str, str], expected: str) -> None:
+    """get_platform_from_driver should normalize platform name from capabilities."""
     d = DummyDrv(caps)
     assert get_platform_from_driver(d) == expected

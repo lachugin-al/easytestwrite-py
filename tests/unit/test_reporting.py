@@ -10,7 +10,8 @@ from mobiauto.reporting.manager import ReportManager
 
 
 def test_attach_screenshot(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    # мок allure.attach
+    """ReportManager.attach_screenshot should read PNG bytes from driver and pass them to allure.attach."""
+    # mock allure.attach
     attached: dict[str, Any] = {}
 
     def fake_attach(data: bytes, name: str, attachment_type: Any) -> None:

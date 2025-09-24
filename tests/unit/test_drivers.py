@@ -12,44 +12,47 @@ from mobiauto.drivers.base import DriverFactory
 
 
 def test_driverfactory_is_abstract() -> None:
-    # Нельзя инстанцировать абстрактный класс без реализации build
+    """You cannot instantiate an abstract class without implementing `build`."""
     with pytest.raises(TypeError):
         DriverFactory()  # type: ignore[abstract]
 
 
 class DummyWebDriver:
-    # имитируем минимальный интерфейс
+    """Minimal stub exposing only quit(), to satisfy the abstract contract."""
     def quit(self) -> None:
         pass
 
 
 class DummyFactory(DriverFactory):
+    """Concrete test factory that records received capabilities and returns a dummy driver."""
+
     def __init__(self) -> None:
         self.received_caps: Mapping[str, Any] | None = None
 
     def build(self, capabilities: Mapping[str, Any]) -> WebDriver:
-        # Сохраняем, что нам передали, и возвращаем заглушку драйвера,
-        # приведя тип к WebDriver для соответствия абстрактному контракту
+        # Record the passed capabilities and return a stub cast to WebDriver
         self.received_caps = capabilities
         return cast(WebDriver, DummyWebDriver())
 
 
 def test_dummyfactory_build_returns_driver_and_receives_caps() -> None:
+    """Ensure DummyFactory.build returns a driver and receives the exact Mapping of capabilities."""
     f = DummyFactory()
     caps: Mapping[str, Any] = {"appium:newCommandTimeout": 120, "platformName": "Android"}
 
     drv = f.build(caps)
 
-    # Проверяем контракт: у драйвера есть quit()
+    # Contract: the driver has quit()
     assert hasattr(drv, "quit")
-    # Убеждаемся, что капы дошли до реализации
+    # The capabilities object is passed through intact
     assert f.received_caps is caps
-    # и что это Mapping, как требует абстрактный контракт
+    # And it's a Mapping, as the abstract contract requires
     assert isinstance(f.received_caps, Mapping)
 
 
 def test_android_driver_factory_build(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Заглушим webdriver.Remote, чтобы не открывать сессию
+    """AndroidDriverFactory should configure options and call webdriver.Remote with proper URL/caps."""
+    # Stub webdriver.Remote to avoid opening a real session
     called: dict[str, Any] = {}
 
     def fake_remote(command_executor: str, options: Any) -> Any:
@@ -90,20 +93,21 @@ def test_android_driver_factory_build(monkeypatch: pytest.MonkeyPatch) -> None:
     from mobiauto.drivers.android import AndroidDriverFactory
 
     AndroidDriverFactory(s).build({"appium:newCommandTimeout": 120})
-    # Проверяем URL без двойного слэша
+    # Ensure URL does not end with a trailing slash duplication
     assert isinstance(called.get("executor"), str)
     assert str(called["executor"]).endswith(":4723")
     caps = called["caps"]
-    # Базовые ключи
+    # Core keys
     assert caps.get("platformName") == "Android" or caps.get("appium:platformName") == "Android"
     assert caps.get("appium:automationName") == "UIAutomator2"
     assert caps.get("appium:appActivity") == "MainActivity"
     assert caps.get("appium:appPackage") == "com.example"
-    # Перезапись raw капой
+    # Raw capability override should take precedence
     assert caps.get("appium:newCommandTimeout") == 120
 
 
 def test_ios_driver_factory_build(monkeypatch: pytest.MonkeyPatch) -> None:
+    """IOSDriverFactory should configure options and call webdriver.Remote with proper URL/caps."""
     called: dict[str, Any] = {}
 
     def fake_remote(command_executor: str, options: Any) -> Any:
@@ -129,7 +133,7 @@ def test_ios_driver_factory_build(monkeypatch: pytest.MonkeyPatch) -> None:
             device_name="iPhone 16 Plus",
             platform_version="18.5",
             app_path="/tmp/app.app",
-            bundle_id="RU.WILDBERRIES.MOBILEAPP.DEV",
+            bundle_id="COM.DEV",
             connect_hardware_keyboard=False,
             auto_accept_alerts=False,
             auto_dismiss_alerts=False,
@@ -146,4 +150,4 @@ def test_ios_driver_factory_build(monkeypatch: pytest.MonkeyPatch) -> None:
     caps = called["caps"]
     assert caps.get("appium:automationName") == "XCUITest"
     assert caps.get("platformName") == "iOS" or caps.get("appium:platformName") == "iOS"
-    assert caps.get("appium:bundleId") == "RU.WILDBERRIES.MOBILEAPP.DEV"
+    assert caps.get("appium:bundleId") == "COM.DEV"

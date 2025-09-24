@@ -11,30 +11,56 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from .locators import PageElement, StrategyValue, resolve_to_selenium
 
-# Defaults
+# ---- Default values ----
 DEFAULT_TIMEOUT_BEFORE_EXPECTATION = 0
 DEFAULT_TIMEOUT_EXPECTATION = 20
 DEFAULT_POLLING_INTERVAL_MS = 500
 DEFAULT_SCROLL_COUNT = 0
-DEFAULT_SCROLL_CAPACITY = 0.7  # 0..1
+DEFAULT_SCROLL_CAPACITY = 0.7  # Value between 0..1
 DEFAULT_SCROLL_DIRECTION: Literal["up", "down", "left", "right"] = "down"
 
 
 class Waits:
+    """
+    Utility class that provides waiting mechanisms for UI elements.
+
+    Includes support for waiting with scrolling, custom polling,
+    and ensuring that a certain number of elements are visible.
+    """
+
     @staticmethod
     def wait_for_elements(
-        driver: WebDriver,
-        target: PageElement | StrategyValue,
-        *,
-        index: int | None = None,
-        settle_for: float = DEFAULT_TIMEOUT_BEFORE_EXPECTATION,
-        timeout: float = DEFAULT_TIMEOUT_EXPECTATION,
-        polling_ms: int = DEFAULT_POLLING_INTERVAL_MS,
-        max_scrolls: int = DEFAULT_SCROLL_COUNT,
-        scroll_percent: float = DEFAULT_SCROLL_CAPACITY,
-        scroll_direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
+            driver: WebDriver,
+            target: PageElement | StrategyValue,
+            *,
+            index: int | None = None,
+            settle_for: float = DEFAULT_TIMEOUT_BEFORE_EXPECTATION,
+            timeout: float = DEFAULT_TIMEOUT_EXPECTATION,
+            polling_ms: int = DEFAULT_POLLING_INTERVAL_MS,
+            max_scrolls: int = DEFAULT_SCROLL_COUNT,
+            scroll_percent: float = DEFAULT_SCROLL_CAPACITY,
+            scroll_direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
     ) -> WebElement:
-        """Ждёт видимости и возвращает n-й видимый элемент (index, начиная с 1)."""
+        """
+        Wait for a visible element and return the N-th visible one (1-based index).
+
+        Args:
+            driver (WebDriver): Selenium/Appium driver instance.
+            target (PageElement | StrategyValue): Locator to search for.
+            index (int, optional): 1-based index of element to return. Defaults to 1.
+            settle_for (float): Wait time before starting element search (for UI stabilization).
+            timeout (float): Maximum time to wait for the element.
+            polling_ms (int): Polling interval in milliseconds.
+            max_scrolls (int): Maximum number of scroll attempts if element not found.
+            scroll_percent (float): How far to scroll (0..1).
+            scroll_direction (Literal): Direction to scroll ("down" by default).
+
+        Returns:
+            WebElement: The found element.
+
+        Raises:
+            NoSuchElementException: If element cannot be found after timeout and scroll attempts.
+        """
         if settle_for and settle_for > 0:
             _wait_for_ui_stability(driver, settle_for, polling_ms)
 
@@ -52,6 +78,7 @@ class Waits:
             if safe_index < 1:
                 raise IndexError(f"Index must be >= 1, got {safe_index}")
 
+            # Try all locators until one succeeds
             for t in tuples:
                 try:
                     attempted.append(t)
@@ -64,6 +91,7 @@ class Waits:
                     failed.append(t)
                     continue
 
+            # Scroll if allowed, then try again
             if max_scrolls > 0 and current_scroll < max_scrolls:
                 _perform_scroll(
                     driver, count=1, capacity=scroll_percent, direction=scroll_direction
@@ -71,6 +99,7 @@ class Waits:
                 current_scroll += 1
                 continue
 
+            # Build debug info for exception message
             locators_info = (
                 f"The following locators {failed} from {attempted} were not found."
                 if failed
@@ -92,18 +121,25 @@ class Waits:
 
     @staticmethod
     def wait_for_element_or_none(
-        driver: WebDriver,
-        target: PageElement | StrategyValue,
-        *,
-        index: int | None = None,
-        settle_for: float = DEFAULT_TIMEOUT_BEFORE_EXPECTATION,
-        timeout: float = DEFAULT_TIMEOUT_EXPECTATION,
-        polling_ms: int = DEFAULT_POLLING_INTERVAL_MS,
-        max_scrolls: int = DEFAULT_SCROLL_COUNT,
-        scroll_percent: float = DEFAULT_SCROLL_CAPACITY,
-        scroll_direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
+            driver: WebDriver,
+            target: PageElement | StrategyValue,
+            *,
+            index: int | None = None,
+            settle_for: float = DEFAULT_TIMEOUT_BEFORE_EXPECTATION,
+            timeout: float = DEFAULT_TIMEOUT_EXPECTATION,
+            polling_ms: int = DEFAULT_POLLING_INTERVAL_MS,
+            max_scrolls: int = DEFAULT_SCROLL_COUNT,
+            scroll_percent: float = DEFAULT_SCROLL_CAPACITY,
+            scroll_direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
     ) -> WebElement | None:
-        """Как wait_for_elements, но возвращает None вместо исключения."""
+        """
+        Same as wait_for_elements, but returns None instead of raising an exception.
+
+        Useful for optional elements where failure is not critical.
+
+        Returns:
+            WebElement | None: Found element, or None if not found.
+        """
         try:
             return Waits.wait_for_elements(
                 driver=driver,
@@ -120,13 +156,13 @@ class Waits:
             return None
 
 
-# ---- Helpers ----
+# ---- Internal helper functions ----
 def _nth_visible_condition(
-    t: StrategyValue, n: int
+        t: StrategyValue, n: int
 ) -> Callable[[WebDriver], list[WebElement] | bool]:
     """
-    Возвращает функцию для WebDriverWait.until:
-    как только видимых элементов по локатору станет >= n - вернёт список; иначе False.
+    Create a function for WebDriverWait.until that returns a list of visible elements
+    when at least `n` elements are visible; otherwise returns False.
     """
 
     def _predicate(drv: WebDriver) -> list[WebElement] | bool:
@@ -141,6 +177,7 @@ def _nth_visible_condition(
 
 
 def _is_displayed_safe(el: WebElement) -> bool:
+    """Safely check if an element is displayed, ignoring exceptions."""
     try:
         return bool(el.is_displayed())
     except Exception:
@@ -148,6 +185,10 @@ def _is_displayed_safe(el: WebElement) -> bool:
 
 
 def _any_visible(tuples: Sequence[StrategyValue]) -> Callable[[WebDriver], WebElement | bool]:
+    """
+    Return a predicate function that finds and returns the first visible element
+    among the provided locators, or False if none are visible.
+    """
     def _predicate(driver: WebDriver) -> WebElement | bool:
         for by, value in tuples:
             try:
@@ -162,6 +203,10 @@ def _any_visible(tuples: Sequence[StrategyValue]) -> Callable[[WebDriver], WebEl
 
 
 def _wait_for_ui_stability(driver: WebDriver, timeout_seconds: float, polling_ms: int) -> None:
+    """
+    Wait until the UI stabilizes (page source stops changing) or timeout is reached.
+    Useful to avoid race conditions after navigation or animations.
+    """
     end = time.monotonic() + timeout_seconds
     previous: str | None = None
     while time.monotonic() < end:
@@ -176,11 +221,20 @@ def _wait_for_ui_stability(driver: WebDriver, timeout_seconds: float, polling_ms
 
 
 def _perform_scroll(
-    driver: WebDriver,
-    count: int = 1,
-    capacity: float = DEFAULT_SCROLL_CAPACITY,
-    direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
+        driver: WebDriver,
+        count: int = 1,
+        capacity: float = DEFAULT_SCROLL_CAPACITY,
+        direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
 ) -> None:
+    """
+    Perform a scroll gesture using Appium's `mobile: scrollGesture` endpoint.
+
+    Args:
+        driver (WebDriver): Appium driver.
+        count (int): Number of scroll attempts to perform.
+        capacity (float): Percentage of the screen to scroll (0..1).
+        direction (Literal): Scroll direction.
+    """
     capacity = min(max(capacity, 0.01), 1.0)
     try:
         size = driver.get_window_size()

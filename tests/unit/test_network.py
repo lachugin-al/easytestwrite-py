@@ -10,6 +10,7 @@ from mobiauto.network.events import Event, EventStore
 
 
 def test_event_store_add_find() -> None:
+    """EventStore should add events and return them by type."""
     store = EventStore()
     e1 = Event(type="a", ts=datetime.now(UTC), payload={"x": 1})
     e2 = Event(type="b", ts=datetime.now(UTC), payload={"y": 2})
@@ -21,7 +22,7 @@ def test_event_store_add_find() -> None:
 
 
 def test_mitmproxy_process(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Поднимем процесс только если enabled=True
+    """MitmProxyProcess should start mitmdump when enabled and terminate it on stop."""
     from mobiauto.network.proxy import MitmProxyProcess
 
     class DummySettings:
@@ -41,7 +42,7 @@ def test_mitmproxy_process(monkeypatch: pytest.MonkeyPatch) -> None:
             called["args"] = args
 
         def poll(self) -> None:
-            return None  # имитируем процесс
+            return None  # emulate a running process
 
         def terminate(self) -> None:
             called["terminated"] = True
@@ -56,6 +57,7 @@ def test_mitmproxy_process(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_mitmproxy_process_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """MitmProxyProcess should not start when proxy.enabled is False."""
     from mobiauto.network.proxy import MitmProxyProcess
 
     class DummySettings:
@@ -75,6 +77,6 @@ def test_mitmproxy_process_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr("mobiauto.network.proxy.Popen", fake_popen)
 
-    # Раз включение выключено, Popen вызываться не должен
+    # With proxy disabled, Popen must not be called
     MitmProxyProcess(cast(Settings, DummySettings())).start()
     assert called["spawned"] is False
