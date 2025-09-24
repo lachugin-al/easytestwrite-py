@@ -1,0 +1,82 @@
+# --- Python / Poetry ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.build/
+build/
+dist/
+*.egg-info/
+.eggs/
+.venv/
+.venv*/
+venv/
+poetry.lock
+
+# --- Pytest / Coverage ---
+.pytest_cache/
+.cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# --- Linters / Type checkers ---
+.mypy_cache/
+.pytype/
+.ruff_cache/
+.dmypy.json
+.pyre/
+
+# --- Allure / Reports / Artifacts ---
+allure-results/
+allure-report/
+artifacts/
+reports/
+logs/
+traces/
+screenshots/
+videos/
+*.trace
+*.trace.zip
+
+# --- Network proxy / HAR / Mitmproxy ---
+*.har
+*.mitmproxy
+
+# --- Mobile artifacts (common) ---
+*.mp4
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# --- App bundles (usually not tracked) ---
+*.apk
+*.aab
+*.ipa
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+Icon?
+ehthumbs.db
+Desktop.ini
+
+# --- IDE / Editor ---
+.idea/
+.vscode/
+*.iml
+
+# --- Env / Secrets ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# --- Local tooling ---
+.tox/
+.nox/
+.pybuilder/
+pip-wheel-metadata/

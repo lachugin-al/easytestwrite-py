@@ -1,0 +1,16 @@
+[run]
+branch = True
+source = mobiauto
+omit =
+    */__init__.py
+    */pytest_plugin/*
+    */runner/*
+    */reporting/video.py
+
+[report]
+show_missing = True
+skip_covered = True
+exclude_lines =
+    pragma: no cover
+    if TYPE_CHECKING:
+    except ImportError:
