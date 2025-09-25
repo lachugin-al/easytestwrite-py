@@ -16,6 +16,6 @@ def pytest_runtest_makereport(item: Any, call: Any) -> None:
     - Mark tests dynamically (e.g. flaky, xfail).
     - Collect additional metadata for custom reporting systems.
 
-    Currently left empty — override as needed in the future.
+    Currently left empty - override as needed in the future.
     """
     pass

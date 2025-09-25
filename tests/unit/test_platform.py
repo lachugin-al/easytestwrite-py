@@ -21,7 +21,7 @@ def test_platform_string_coercion_and_equality() -> None:
     assert Platform.ANDROID.value == "android"
     assert Platform.IOS.value == "ios"
 
-    # Useful in sets/dicts — compare by .value
+    # Useful in sets/dicts - compare by .value
     s = {Platform.ANDROID, Platform.IOS}
     sv = {e.value for e in s}
     assert "android" in sv

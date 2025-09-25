@@ -32,7 +32,7 @@ def test_run_cmd_error_check_true_raises() -> None:
 
 def test_run_cmd_spawn(monkeypatch: pytest.MonkeyPatch) -> None:
     """When spawn=True, run_cmd should return the Popen instance without waiting."""
-    # Do not spawn a real process — patch Popen
+    # Do not spawn a real process - patch Popen
     spawned: dict[str, Any] = {}
 
     class DummyP:

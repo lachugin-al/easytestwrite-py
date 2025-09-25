@@ -10,13 +10,13 @@ repos:
         args: [--fix]          # auto-fix where possible
       - id: ruff-format        # formatting
 
-  # Black — deterministic code formatter
+  # Black - deterministic code formatter
   - repo: https://github.com/psf/black
     rev: 24.10.0
     hooks:
       - id: black
 
-  # Isort — separate run if we want it independently from Ruff
+  # Isort - separate run if we want it independently from Ruff
   - repo: https://github.com/PyCQA/isort
     rev: 5.13.2
     hooks:
@@ -35,7 +35,7 @@ repos:
       - id: check-yaml
       - id: check-toml
 
-  # Mypy — via a local hook to run inside the poetry venv
+  # Mypy - via a local hook to run inside the poetry venv
   - repo: local
     hooks:
       - id: mypy

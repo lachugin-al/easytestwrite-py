@@ -108,7 +108,7 @@ check_untyped_defs = true
 pretty = true
 show_error_codes = true
 
-# External packages without typings — do not fail the build
+# External packages without typings - do not fail the build
 ignore_missing_imports = true
 
 # Relaxations for tests/*
