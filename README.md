@@ -161,4 +161,4 @@ Tip: You can create a local `.env` (not committed) or export vars in your shell.
 - For iOS, ensure Xcode command line tools and simulators are properly configured
 
 ## License
-TODO: Add a LICENSE file (e.g., MIT, Apache-2.0) and reference it here.
+This project is licensed under the MIT License - see the LICENSE file for details.
