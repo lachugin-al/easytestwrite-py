@@ -1,0 +1,60 @@
+# ---- pre-commit hooks for this repo ----
+# These run on top of our configs in pyproject.toml (ruff/black/isort/mypy)
+
+repos:
+  # Fast general linter (includes isort-like import rules)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]          # auto-fix where possible
+      - id: ruff-format        # formatting
+
+  # Black - deterministic code formatter
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+
+  # Isort - separate run if we want it independently from Ruff
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ["--profile", "black"]
+
+  # Basic repository hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: check-yaml
+      - id: check-toml
+
+  # Mypy - via a local hook to run inside the poetry venv
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (poetry)
+        entry: bash -c 'poetry run mypy src tests'
+        language: system
+        pass_filenames: false
+        types: [python]
+
+# Global exclusions (optional)
+exclude: |
+  (?x)^(
+      .venv/|
+      build/|
+      dist/|
+      .coverage_html/|
+      .*\.png$|
+      .*\.jpg$|
+      .*\.jpeg$|
+      .*\.gif$|
+      .*\.mp4$
+  )

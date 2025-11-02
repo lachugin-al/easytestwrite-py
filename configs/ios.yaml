@@ -1,0 +1,23 @@
+
+platform: ios
+appium:
+  url: http://127.0.0.1:4723/
+
+ios:
+  device_name: "iPhone 16 Plus"
+  platform_version: "18.5"
+  app_path: /path/to/your/.app
+  bundle_id: COM.DEV
+  connect_hardware_keyboard: false
+  auto_accept_alerts: false
+  auto_dismiss_alerts: false
+  show_ios_log: false
+  auto_launch: true
+  process_arguments: {}
+  custom_snapshot_timeout: 3
+
+reporting:
+  allure_dir: artifacts/allure
+
+capabilities:
+  raw: {}

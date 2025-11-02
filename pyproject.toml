@@ -1,0 +1,141 @@
+[tool.poetry]
+name = "mobile-automation"
+version = "0.1.0"
+description = "Mobile app automation: pytest + Appium v3"
+authors = ["Anton Lachugin <anton.lachugin.l@gmail.com>"]
+packages = [{ include = "mobiauto", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.13"
+pytest = "^8.3"
+pytest-xdist = "^3.6"
+pytest-rerunfailures = "^14.0"
+allure-pytest = "^2.13"
+pydantic = "^2.7"
+pydantic-settings = "^2.5"
+appium-python-client = "^4.0"
+structlog = "^24.4"
+tenacity = "^9.0"
+typer = "^0.12"
+PyYAML = "^6.0"
+types-pyyaml = "^6.0.12"
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.8"
+isort = "^5.13"
+ruff = "^0.6"
+mypy = "^1.11"
+pytest-cov = "^7.0.0"
+pre-commit = "^4.3.0"
+
+[tool.pytest.ini_options]
+addopts = "-q --strict-markers --cov=mobiauto --cov-report=term-missing"
+markers = [
+    "android: run on Android",
+    "ios: run on iOS",
+    "smoke: fast build-verifier suite",
+]
+
+[tool.poetry.scripts]
+mobiauto = "mobiauto.runner.main:app"
+
+# ------------------------------
+# Formatting / Lint
+# ------------------------------
+
+[tool.black]
+line-length = 100
+target-version = ["py313"]
+include = "\\.pyi?$"
+exclude = """
+/(
+    \\.venv
+  | build
+  | dist
+  | .coverage_html
+)/
+"""
+
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["mobiauto"]
+src_paths = ["src", "tests"]
+skip = [".venv", "build", "dist", ".coverage_html"]
+
+[tool.ruff]
+# General settings
+line-length = 100
+target-version = "py313"
+src = ["src", "tests"]
+exclude = [".venv", "build", "dist", ".coverage_html"]
+
+[tool.ruff.lint]
+# Ruleset: pyflakes/pycodestyle, isort, bugbear, modernizations, etc.
+select = [
+    "E",   # pycodestyle (errors)
+    "F",   # pyflakes
+    "I",   # isort (imports)
+    "B",   # bugbear
+    "C4",  # comprehensions
+    "UP",  # pyupgrade
+    "N",   # naming
+    "A",   # builtins
+    "T20", # print
+    "W",   # pycodestyle (warnings)
+]
+ignore = [
+    "E501",   # line length is enforced by Black
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["mobiauto"]
+
+# ------------------------------
+# MyPy (static typing)
+# ------------------------------
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+check_untyped_defs = true
+pretty = true
+show_error_codes = true
+
+# External packages without typings - do not fail the build
+ignore_missing_imports = true
+
+# Relaxations for tests/*
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+check_untyped_defs = false
+
+# ------------------------------
+# Coverage (in pyproject instead of .coveragerc)
+# ------------------------------
+
+[tool.coverage.run]
+branch = true
+source = ["mobiauto"]
+omit = [
+    "*/__init__.py",
+    "*/pytest_plugin/*",
+    "*/runner/*",
+    "*/reporting/video.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "except ImportError",
+    "if __name__ == .__main__.:",
+]

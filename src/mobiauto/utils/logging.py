@@ -1,0 +1,194 @@
+from __future__ import annotations
+
+import json
+import os
+import threading
+from collections.abc import Mapping, MutableMapping
+from pathlib import Path
+from typing import Any
+
+import structlog
+from structlog.contextvars import bind_contextvars, clear_contextvars, merge_contextvars
+
+_LOG_DIR = Path("artifacts/logs")
+_FRAMEWORK_LOG = _LOG_DIR / "framework.log"
+
+# Context keys that will automatically be included in logs
+_CONTEXT_KEYS = ("platform", "device", "test", "session_id")
+
+
+def _ensure_log_dir() -> None:
+    """Ensure that the log directory exists."""
+    try:
+        _LOG_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+
+
+def _level_from_env() -> int:
+    """Get the log level from MOBIAUTO_LOG_LEVEL (TRACE|DEBUG|INFO|WARNING|ERROR)."""
+    import logging
+
+    raw = os.getenv("MOBIAUTO_LOG_LEVEL", "INFO").upper()
+    if raw == "TRACE":
+        # Level below DEBUG — use a numeric value smaller than DEBUG
+        return 5
+    return getattr(logging, raw, logging.INFO)
+
+
+_file_lock = threading.RLock()
+
+
+def _copy_event_to_message(
+    logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
+) -> Mapping[str, Any]:
+    # For consistency, add a "message" field as a copy of the standard "event"
+    if "event" in event_dict and "message" not in event_dict:
+        event_dict["message"] = event_dict["event"]
+    return event_dict
+
+
+def _drop_none_values(
+    logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
+) -> Mapping[str, Any]:
+    """Remove all keys with None values from the log event."""
+    return {k: v for k, v in event_dict.items() if v is not None}
+
+
+def _file_sink_processor(
+    logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
+) -> MutableMapping[str, Any]:
+    """
+    Processor that duplicates log entries into files:
+    - artifacts/logs/framework.log — all events
+    - artifacts/logs/test_<name>.log — events for the current test (if a test context is present)
+    """
+    _ensure_log_dir()
+
+    # Prepare a JSON string in advance to ensure consistent writes to both files
+    line = json.dumps(event_dict, ensure_ascii=False)
+
+    test_name = event_dict.get("test") or event_dict.get("test_name")
+    test_path = None
+    if isinstance(test_name, str) and test_name:
+        safe = test_name.replace(os.sep, "_").replace("/", "_").replace(" ", "_").replace(":", "_")
+        test_path = _LOG_DIR / f"test_{safe}.log"
+
+    try:
+        with _file_lock:
+            with _FRAMEWORK_LOG.open("a", encoding="utf-8") as f:
+                f.write(line + "\n")
+            if test_path is not None:
+                with Path(test_path).open("a", encoding="utf-8") as f:
+                    f.write(line + "\n")
+    except Exception:
+        # Never fail due to log writing issues
+        pass
+
+    return event_dict
+
+
+def current_test_log_path(test_name: str | None = None) -> Path:
+    """Return the path to the current test’s log file (or the expected test), if its name is known."""
+    _ensure_log_dir()
+    # If no test name is provided, return the global log file
+    if not test_name:
+        return _FRAMEWORK_LOG
+
+    safe = str(test_name).replace(os.sep, "_").replace("/", "_").replace(" ", "_").replace(":", "_")
+    return _LOG_DIR / f"test_{safe}.log"
+
+
+def bind_context(
+    *, settings: Any | None = None, driver: Any | None = None, test_name: str | None = None
+) -> None:
+    """Bind logging context variables with platform/device/test/session information."""
+    platform = None
+    device = None
+    session_id = None
+
+    try:
+        if settings is not None:
+            platform = getattr(settings, "platform", None)
+            if platform == "android" and getattr(settings, "android", None):
+                device = getattr(settings.android, "device_name", None)
+            elif platform == "ios" and getattr(settings, "ios", None):
+                device = getattr(settings.ios, "device_name", None)
+    except Exception:
+        pass
+
+    try:
+        if driver is not None:
+            session_id = getattr(driver, "session_id", None)
+    except Exception:
+        pass
+
+    bind_contextvars(platform=platform, device=device, test=test_name, session_id=session_id)
+
+
+_CONFIGURED = False
+
+
+def setup_logging() -> None:
+    """
+    Centralized setup for structured logging with JSON output and file duplication.
+
+    Includes:
+    - Log level from MOBIAUTO_LOG_LEVEL
+    - ISO 8601 timestamp (key: timestamp)
+    - Context (platform, device, test, session_id) via contextvars
+    - Duplication of every record into artifacts/logs/framework.log and test_<name>.log
+    - Unified JSON format printed to stdout (compatible with existing unit tests)
+    """
+    import logging
+
+    global _CONFIGURED
+    if _CONFIGURED:
+        return
+
+    _ensure_log_dir()
+    level = _level_from_env()
+
+    structlog.configure(
+        processors=[
+            merge_contextvars,  # Automatically inject bound context
+            structlog.processors.add_log_level,
+            structlog.processors.TimeStamper(fmt="iso", key="timestamp"),
+            structlog.processors.CallsiteParameterAdder(
+                [structlog.processors.CallsiteParameter.MODULE]
+            ),
+            _copy_event_to_message,
+            _drop_none_values,
+            _file_sink_processor,  # Duplicate logs into file(s)
+            structlog.processors.JSONRenderer(),
+        ],
+        logger_factory=structlog.PrintLoggerFactory(),  # Output to stdout (test compatible)
+        wrapper_class=structlog.make_filtering_bound_logger(level),
+        cache_logger_on_first_use=True,
+    )
+
+    # Synchronize level with standard logging (for third-party libraries)
+    logging.getLogger().setLevel(level)
+
+    _CONFIGURED = True
+
+
+def get_logger(name: str | None = None) -> Any:
+    """Return a configured structlog logger; auto-configures logging if not yet initialized."""
+    # Ensure logging is configured even in standalone unit tests
+    if not globals().get("_CONFIGURED", False):
+        try:
+            setup_logging()
+        except Exception:
+            # Never block execution due to configuration problems
+            pass
+    return structlog.get_logger(name or __name__)
+
+
+__all__ = [
+    "setup_logging",
+    "bind_context",
+    "current_test_log_path",
+    "get_logger",
+    "clear_contextvars",
+]
