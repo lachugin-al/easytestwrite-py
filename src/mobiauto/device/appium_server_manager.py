@@ -180,7 +180,7 @@ class AppiumServerManager:
                 return
             time.sleep(0.5)
 
-        # If server never became healthy — kill the process to avoid "zombie"
+        # If server never became healthy - kill the process to avoid "zombie"
         if self._state.started_by_us and self._state.proc is not None:
             try:
                 getattr(self._state.proc, "kill", lambda: None)()
@@ -207,7 +207,7 @@ class AppiumServerManager:
             pass
         log_file = os.path.join(log_dir, "appium-server.log")
 
-        # Start Appium process via `exec` —
+        # Start Appium process via `exec` -
         # this ensures terminate/kill signals are delivered directly to Appium
         # and the process exits correctly on shutdown.
         cmd = f"exec appium --address {host} --port {port} >> {log_file} 2>&1"

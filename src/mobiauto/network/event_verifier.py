@@ -38,9 +38,9 @@ def match_json_element(event_element: Any, search_element: Any) -> bool:
     Supported:
 
     - Primitives with patterns:
-      - "*"       — any value matches
-      - ""        — only empty string matches
-      - "~value"  — substring match against actual string
+      - "*"       - any value matches
+      - ""        - only empty string matches
+      - "~value"  - substring match against actual string
     - Objects:
       - every key/value from the expected object must match in the actual object
     - Arrays:

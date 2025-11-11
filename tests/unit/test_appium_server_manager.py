@@ -30,7 +30,7 @@ def _level_from_env() -> int:
 
     raw = os.getenv("MOBIAUTO_LOG_LEVEL", "INFO").upper()
     if raw == "TRACE":
-        # A level below DEBUG — use a numeric value less than DEBUG
+        # A level below DEBUG - use a numeric value less than DEBUG
         return 5
     return getattr(logging, raw, logging.INFO)
 
@@ -58,8 +58,8 @@ def _file_sink_processor(
 ) -> MutableMapping[str, Any]:
     """
     Processor that duplicates a log record into files:
-    - artifacts/logs/framework.log — all events
-    - artifacts/logs/test_<name>.log — events for the current test (if the 'test' context is present)
+    - artifacts/logs/framework.log - all events
+    - artifacts/logs/test_<name>.log - events for the current test (if the 'test' context is present)
     """
     _ensure_log_dir()
 

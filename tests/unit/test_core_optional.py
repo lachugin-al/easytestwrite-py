@@ -114,7 +114,7 @@ def test_optional_for_raises_when_suppress_false() -> None:
 def test_optional_ios_and_android_wrappers() -> None:
     """
     optional_ios executes the step only on iOS.
-    optional_android — only on Android.
+    optional_android - only on Android.
     Other platforms → the step is ignored without error.
     """
     # iOS platform → optional_ios call must execute

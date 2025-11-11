@@ -104,7 +104,7 @@ class TestMobileController:
             return self._switch_to
 
     class StepSpy:
-        """Allure step spy — accumulates step titles."""
+        """Allure step spy - accumulates step titles."""
 
         def __init__(self) -> None:
             self.titles: list[str] = []
@@ -135,7 +135,7 @@ class TestMobileController:
             self.success_snaps = 0
             self.fail_artifacts = 0
 
-        # Appears under different names in various blocks — support both counters
+        # Appears under different names in various blocks - support both counters
         def attach_screenshot_if_allowed(self, driver: Any, *, when: str) -> None:
             if when == "success":
                 self.success += 1

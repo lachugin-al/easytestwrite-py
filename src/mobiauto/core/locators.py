@@ -269,7 +269,7 @@ def pretty_locator(driver: Any, locator: StrategyValue | PageElement) -> str:
     try:
         tuples = resolve_to_selenium(driver, locator)
     except Exception:
-        # In case of errors resolving the locator — just use str(locator)
+        # In case of errors resolving the locator - just use str(locator)
         return str(locator)
     formatted = [format_strategy_value(t) for t in tuples]
     return " | ".join(formatted)

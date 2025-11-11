@@ -86,7 +86,7 @@ def virtual_device(
 
     Does nothing if:
     - platform configuration is missing (android/ios is None), or
-    - a physical device UDID is provided — in that case device management is considered external.
+    - a physical device UDID is provided - in that case device management is considered external.
     """
     # For unit tests we don't need to auto-start a virtual device.
     # If pytest is explicitly run against tests/unit, skip device management.
@@ -107,7 +107,7 @@ def virtual_device(
     mgr: EmulatorManager | None = None
 
     if settings.platform == "android" and settings.android:
-        # If UDID is provided, assume a physical device is connected — do not start emulator
+        # If UDID is provided, assume a physical device is connected - do not start emulator
         if settings.android.udid:
             yield
             return
@@ -128,7 +128,7 @@ def virtual_device(
         if udid:
             mgr = IOSSimulatorManager(udid=udid)
         else:
-            # No UDID and no matching simulator name — do nothing
+            # No UDID and no matching simulator name - do nothing
             yield
             return
 
@@ -214,7 +214,7 @@ def mitm_proxy(
         "pid": <mitm process pid>
     }
     """
-    # If proxy is disabled in config — do not start it
+    # If proxy is disabled in config - do not start it
     if not getattr(settings, "proxy", None) or not settings.proxy.enabled:
         yield None
         return
@@ -237,10 +237,10 @@ def mitm_proxy(
     cfg_port = getattr(settings.proxy, "port", None)
     selected_port = None
     try:
-        # If port is explicitly set in config — use it. Otherwise, pick a free one.
+        # If port is explicitly set in config - use it. Otherwise, pick a free one.
         if cfg_port:
             selected_port = int(cfg_port)
-            # If already in use — pick a free port and log warning
+            # If already in use - pick a free port and log warning
             if is_listening(bind_host, selected_port):
                 _logger.warning(
                     "settings.proxy.port %d is already in use - picking a free port",

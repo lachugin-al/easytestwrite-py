@@ -15,7 +15,7 @@ class NumberParser:
     - Extracts the first numeric token (with an optional sign), ignoring trailing currency symbols.
     - If both comma and dot are present, the rightmost one is treated as the decimal separator.
     - If only one of {',' '.'} is present, and the last group after it has length 3
-      while the preceding groups also have length 3 — the separator is treated as a thousands
+      while the preceding groups also have length 3 - the separator is treated as a thousands
       separator and removed; otherwise it is treated as a decimal separator.
     - Spaces and apostrophes are always treated as thousands separators and removed.
     """
@@ -65,7 +65,7 @@ class NumberParser:
         # Remove explicit thousands separators: spaces and apostrophes
         cand = cand.replace(" ", "").replace("'", "").replace("’", "")
 
-        # If only digits remain — simple integer case
+        # If only digits remain - simple integer case
         if re.fullmatch(r"\d+", cand):
             try:
                 return sign * float(int(cand))
@@ -118,7 +118,7 @@ class NumberParser:
                 # Otherwise treat as decimal separator
                 return _as_float(cand, sep)
 
-        # No dots or commas left — check if only digits remain
+        # No dots or commas left - check if only digits remain
         if re.fullmatch(r"\d+", cand):
             try:
                 return sign * float(int(cand))

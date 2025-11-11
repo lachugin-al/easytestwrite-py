@@ -88,7 +88,7 @@ class MobileController:
                 try:
                     alert.accept()
                 except NoAlertPresentException:
-                    # Rare race: alert disappeared between wait and action — retry briefly
+                    # Rare race: alert disappeared between wait and action - retry briefly
                     alert = self._wait_for_alert(1)
                     alert.accept()
                 self.report_manager.attach_screenshot_if_allowed(self.driver, when="success")
@@ -107,7 +107,7 @@ class MobileController:
                 try:
                     alert.dismiss()
                 except NoAlertPresentException:
-                    # Rare race — retry with a short wait
+                    # Rare race - retry with a short wait
                     alert = self._wait_for_alert(1)
                     alert.dismiss()
                 self.report_manager.attach_screenshot_if_allowed(self.driver, when="success")
@@ -285,7 +285,7 @@ class MobileController:
                     # Prefer native Appium gesture if available
                     self.driver.execute_script("mobile: doubleClickGesture", {"elementId": el.id})
                 except Exception:
-                    # Fallback — two quick standard clicks
+                    # Fallback - two quick standard clicks
                     el.click()
                     el.click()
                 self.report_manager.attach_screenshot_if_allowed(self.driver, when="success")
@@ -609,7 +609,7 @@ class MobileController:
     def pinch_open(
         self, target: PageElement | StrategyValue, percent: float = 0.8, **params: Any
     ) -> None:
-        """Zoom in (pinch open) on an element — iOS `pinchOpenGesture`."""
+        """Zoom in (pinch open) on an element - iOS `pinchOpenGesture`."""
         step_title = params.pop("step", None) or params.pop("step_title", None)
         loc = pretty_locator(self.driver, target)
         title = step_title or f"Pinch Open (zoom in) on element: {loc}"
@@ -630,7 +630,7 @@ class MobileController:
     def pinch_close(
         self, target: PageElement | StrategyValue, percent: float = 0.8, **params: Any
     ) -> None:
-        """Zoom out (pinch close) on an element — iOS `pinchCloseGesture`."""
+        """Zoom out (pinch close) on an element - iOS `pinchCloseGesture`."""
         step_title = params.pop("step", None) or params.pop("step_title", None)
         loc = pretty_locator(self.driver, target)
         title = step_title or f"Pinch Close (zoom out) on element: {loc}"
@@ -869,7 +869,7 @@ class MobileController:
                     # On error, attach artifacts as with other actions
                     self.report_manager.attach_artifacts_on_failure(self.driver)
                     raise ValueError(f"Failed to parse a number from string: '{raw}'")
-                # Successful step — log and attach screenshot if needed
+                # Successful step - log and attach screenshot if needed
                 self._log.info(
                     "Numeric value read",
                     action="get_number",
@@ -1083,7 +1083,7 @@ class MobileController:
          - Uses Appium Mobile Command `mobile: deepLink` with url + package parameters.
         iOS:
          - First, try `mobile: deepLink` with bundleId (if provided in config).
-         - On error/absence of bundleId — fallback via simulator: `xcrun simctl openurl` to a local
+         - On error/absence of bundleId - fallback via simulator: `xcrun simctl openurl` to a local
            page that contains a link with id=deeplink.
         """
         platform = (get_platform_from_driver(self.driver) or "").lower()

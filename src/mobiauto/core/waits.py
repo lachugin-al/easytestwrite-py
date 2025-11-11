@@ -123,7 +123,7 @@ class Waits:
                             failed.append(t)
                             continue
 
-                    # If allowed — perform scroll and retry
+                    # If allowed - perform scroll and retry
                     if max_scrolls > 0 and current_scroll < max_scrolls:
                         _perform_scroll(
                             driver, count=1, capacity=scroll_percent, direction=scroll_direction
@@ -177,7 +177,7 @@ class Waits:
                         f"'{current_scroll}' scroll(s). {locators_info}"
                     )
             except Exception:
-                # On wait step failure — attach artifacts centrally
+                # On wait step failure - attach artifacts centrally
                 ReportManager.get_default().attach_artifacts_on_failure(driver)
                 raise
 

@@ -204,7 +204,7 @@ class AndroidEmulatorManager(EmulatorManager):
                 pass
             time.sleep(1.0)
         else:
-            # Transport never came up — log warning and exit gracefully.
+            # Transport never came up - log warning and exit gracefully.
             self._log.warning(
                 "ADB transport is not ready - skipping early proxy application (target=%s)", target
             )
@@ -227,7 +227,7 @@ class AndroidEmulatorManager(EmulatorManager):
                 )
                 time.sleep(1.5)
         else:
-            # All attempts failed — log and continue without failing tests.
+            # All attempts failed - log and continue without failing tests.
             self._log.warning(
                 "Failed to apply http_proxy after 5 attempts - continuing without it."
             )
@@ -239,7 +239,7 @@ class AndroidEmulatorManager(EmulatorManager):
         """
         Remove system proxy in the emulator.
         """
-        # Preferred way — delete; if unavailable, fall back to put ''.
+        # Preferred way - delete; if unavailable, fall back to put ''.
         res = self._adb("shell", "settings", "delete", "global", "http_proxy", capture_output=True)
         if res.returncode != 0:
             # Fallback:
