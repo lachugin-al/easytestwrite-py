@@ -7,17 +7,17 @@ class NumberParser:
     """
     Extracts the first numeric value from an arbitrary string and converts it to a float.
 
-    Suitable for prices or amounts that contain non-breaking/thin spaces, currency symbols,
-    apostrophes (') / typographic quotes (’), mixed thousand and decimal separators (',' or '.').
+    Suitable for prices or amounts containing non-breaking/thin spaces, currency symbols,
+    apostrophes (') / typographic quotes (’), and mixed thousand/decimal separators (',' or '.').
 
-    Heuristics:
-    - Normalizes special spaces to regular spaces.
-    - Extracts the first numeric token (with an optional sign), ignoring currency suffixes.
-    - If both comma and dot are present, the rightmost one is considered the decimal separator.
-    - If only one of {',' '.'} is present and the last part after the separator is 3 digits long
-      while preceding groups are also 3 digits each, the separator is treated as a thousand separator and removed.
-      Otherwise, it is treated as a decimal separator.
-    - Spaces and apostrophes are always considered thousand separators and removed.
+    Heuristic rules:
+    - Normalizes special spaces into regular spaces.
+    - Extracts the first numeric token (with an optional sign), ignoring trailing currency symbols.
+    - If both comma and dot are present, the rightmost one is treated as the decimal separator.
+    - If only one of {',' '.'} is present, and the last group after it has length 3
+      while the preceding groups also have length 3 — the separator is treated as a thousands
+      separator and removed; otherwise it is treated as a decimal separator.
+    - Spaces and apostrophes are always treated as thousands separators and removed.
     """
 
     # Special spaces: NBSP, NNBSP, Thin Space, Narrow No-Break Space, etc.
@@ -35,15 +35,15 @@ class NumberParser:
     @staticmethod
     def _extract_candidate(s: str) -> str | None:
         """Extract the first numeric fragment (including an optional sign)."""
-        # Remove approximation marks and similar symbols
+        # Remove approximate symbols (~, ≈, etc.)
         s = s.replace("≈", " ")
         s = NumberParser._normalize_spaces(s)
-        # Find a fragment: optional sign, then a digit followed by allowed characters
+        # Match: optional sign, then digit followed by allowed characters
         m = re.search(r"[+\-]?\s*\d[0-9\s.,'’]*", s)
         if not m:
             return None
         cand = m.group(0)
-        # Trim any trailing disallowed characters (though regex already restricts them)
+        # Trim potential trailing noise (we already filtered allowed chars)
         return cand.strip()
 
     @staticmethod
@@ -53,7 +53,7 @@ class NumberParser:
         if not cand:
             return None
 
-        # Extract and preserve sign
+        # Extract and apply sign
         sign = 1.0
         cand = cand.strip()
         if cand.startswith("+"):
@@ -62,26 +62,26 @@ class NumberParser:
             cand = cand[1:].lstrip()
             sign = -1.0
 
-        # Remove explicit thousand separators: spaces and apostrophes
+        # Remove explicit thousands separators: spaces and apostrophes
         cand = cand.replace(" ", "").replace("'", "").replace("’", "")
 
-        # If only digits remain — simplest case
+        # If only digits remain — simple integer case
         if re.fullmatch(r"\d+", cand):
             try:
                 return sign * float(int(cand))
             except Exception:
                 return None
 
-        # Determine the role of comma and dot
+        # Determine role of comma/dot
         last_dot = cand.rfind(".")
         last_comma = cand.rfind(",")
 
         def _as_float(body: str, dec: str | None) -> float | None:
             try:
                 if dec is None:
-                    # Only integer part
+                    # Integer part only
                     return sign * float(int(body))
-                # Remove all other thousand separators (the opposite symbol)
+                # Remove opposite separator used for thousands
                 if dec == ".":
                     body = body.replace(",", "")
                 else:
@@ -93,18 +93,15 @@ class NumberParser:
                 return None
 
         if last_dot != -1 and last_comma != -1:
-            # The decimal separator is whichever appears last
-            if last_dot > last_comma:
-                dec = "."
-            else:
-                dec = ","
+            # Decimal separator is the rightmost one
+            dec = "." if last_dot > last_comma else ","
             return _as_float(cand, dec)
 
         # Only one separator present
         if last_dot != -1 or last_comma != -1:
             sep = "." if last_dot != -1 else ","
             parts = cand.split(sep)
-            # Example: ['12','345','678'] or ['2','000'] → probably thousand separators
+            # Example patterns ['12','345','678'] or ['2','000'] → likely thousands separators
             if len(parts) >= 2:
                 last_len = len(parts[-1])
                 has_middle = len(parts) > 2
@@ -115,20 +112,20 @@ class NumberParser:
                     or any(len(p) == 3 for p in parts[1:-1])
                     or (len(parts) == 2 and leading.isdigit() and 1 <= len(leading) <= 3)
                 ):
-                    # Treat as thousand separators: remove the separator entirely
+                    # Treat as thousands separator: remove it
                     joined = "".join(parts)
                     return _as_float(joined, None)
-                # Otherwise, treat it as a decimal separator
+                # Otherwise treat as decimal separator
                 return _as_float(cand, sep)
 
-        # No comma or dot left — check for pure digits again
+        # No dots or commas left — check if only digits remain
         if re.fullmatch(r"\d+", cand):
             try:
                 return sign * float(int(cand))
             except Exception:
                 return None
 
-        # Parsing failed by heuristics
+        # Could not parse according to heuristic
         return None
 
 

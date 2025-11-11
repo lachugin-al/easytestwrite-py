@@ -5,25 +5,60 @@ from typing import cast
 from pydantic import BaseModel, Field, HttpUrl
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
+from mobiauto.utils.net import get_free_port
+
+
+class ProxySettings(BaseModel):
+    """
+    Built-in mitmproxy settings.
+
+    Fields:
+    - enabled: enable/disable proxy launch by the framework
+    - host: interface to bind (default 127.0.0.1)
+    - port: proxy port. If not specified - a random free port is chosen via get_free_port().
+    - addons: list of paths to mitm addons (relative to repo root or absolute)
+    - mitm_args: additional arguments for mitm (will be filtered from dangerous ones)
+    - health_port: health endpoint port (0 - disable)
+    - log_dir: directory for proxy logs (default artifacts/proxy)
+    """
+
+    enabled: bool = False
+    host: str = "127.0.0.1"
+    port: int | None = None
+    addons: list[str] = Field(default_factory=lambda: [])
+    mitm_args: list[str] = Field(
+        default_factory=lambda: ["--set", "connection_strategy=lazy", "--set", "block_global=false"]
+    )
+    mitm_bin: str = "mitmdump"
+    health_port: int = 8079
+    log_dir: str = "artifacts/proxy"
+    strict: bool = True  # if True - fail-fast on proxy start failure
+    install_ca: bool = (
+        False  # if True - attempt to install CA into emulator/simulator (only when needed)
+    )
+
 
 class ReportingSettings(BaseModel):
-    """Configuration of test reporting and artifacts."""
+    """Configuration for test reporting and artifacts."""
 
-    allure_dir: str = "artifacts/allure"  # Directory for storing Allure results
+    allure_dir: str = "artifacts/allure"  # Directory to store Allure results
     screenshots_on_fail: bool = True  # Take screenshots on test failures
     screenshots_on_success: bool = False  # Take screenshots on successful steps
-    page_source_on_fail: bool = True  # Attach page source on test failures
+    page_source_on_fail: bool = True  # Attach page source on failures
     page_source_on_success: bool = False  # Attach page source on successful steps
-    screenshot_name: str = "screenshot"  # Default attachment name for screenshots
-    page_source_name: str = "page source"  # Default attachment name for page source
+    screenshot_name: str = "screenshot"  # Default name for screenshot attachment
+    page_source_name: str = "page source"  # Default name for page source attachment
     video: bool = True  # Record video during test execution
     traces: bool = True  # Save Appium traces
 
 
 class AppiumServer(BaseModel):
-    """Configuration for connecting to the Appium server."""
+    """Configuration for connecting to Appium server."""
 
-    url: HttpUrl = Field(default=cast(HttpUrl, "http://127.0.0.1:4723/"))  # Appium server URL
+    # Appium server URL. Default: http://127.0.0.1:<free port>/
+    url: HttpUrl = Field(
+        default_factory=lambda: cast(HttpUrl, f"http://127.0.0.1:{get_free_port()}/")
+    )
 
 
 class AndroidConfig(BaseModel):
@@ -31,19 +66,19 @@ class AndroidConfig(BaseModel):
 
     device_name: str  # Device or emulator name
     platform_version: str  # Android OS version
-    app_path: str | None = None  # Path to the application APK file
-    avd: str | None = None  # Android Virtual Device name (if using an emulator)
+    app_path: str | None = None  # Path to the APK file of the app
+    avd: str | None = None  # Android Virtual Device name (if using emulator)
     udid: str | None = None  # Unique device identifier (for physical devices)
     emulator_port: int | None = None  # Emulator port (default 5554), can be overridden
     app_package: str | None = None  # Application package name
-    app_activity: str | None = None  # Main activity for launching the app
-    no_reset: bool = False  # Keep app state between sessions
+    app_activity: str | None = None  # Main activity to launch the app
+    no_reset: bool = False  # Preserve app state between sessions
     new_command_timeout: int = 100  # Timeout for new Appium commands (in seconds)
     dont_stop_app_on_reset: bool = False  # Do not stop the app on reset
     unicode_keyboard: bool = True  # Enable Unicode keyboard support
-    adb_exec_timeout_ms: int = 40_000  # Timeout for ADB commands (in milliseconds)
-    auto_grant_permissions: bool = True  # Automatically grant app permissions
-    auto_launch: bool = True  # Automatically launch the app
+    adb_exec_timeout_ms: int = 40_000  # Timeout for ADB command execution (in milliseconds)
+    auto_grant_permissions: bool = True  # Auto-grant permissions to the app
+    auto_launch: bool = True  # Auto-launch the application
 
 
 class IOSConfig(BaseModel):
@@ -51,39 +86,32 @@ class IOSConfig(BaseModel):
 
     device_name: str  # Device or simulator name
     platform_version: str  # iOS version
-    app_path: str | None = None  # Path to the .app or .ipa file
+    app_path: str | None = None  # Path to .app or .ipa file of the app
     udid: str | None = None  # Unique device identifier (for physical devices)
     bundle_id: str | None = None  # Application bundle identifier
-    connect_hardware_keyboard: bool = False  # Connect hardware keyboard in simulator
+    connect_hardware_keyboard: bool = False  # Connect physical keyboard to simulator
     auto_accept_alerts: bool = False  # Automatically accept system alerts
     auto_dismiss_alerts: bool = False  # Automatically dismiss system alerts
     show_ios_log: bool = False  # Show iOS system logs during execution
-    auto_launch: bool = True  # Automatically launch the app
+    auto_launch: bool = True  # Auto-launch the application
     process_arguments: dict[str, list[str]] = Field(
         default_factory=dict
     )  # Additional process arguments
-    custom_snapshot_timeout: int = 3  # Custom timeout for taking screenshots
+    custom_snapshot_timeout: int = 3  # Custom timeout for taking snapshots
 
 
 class Capabilities(BaseModel):
-    """Custom raw capabilities for Appium/WebDriver sessions."""
+    """User-provided 'raw' capabilities for Appium/WebDriver sessions."""
 
     raw: dict[str, object] = Field(default_factory=dict)
 
 
-class VirtualDeviceSettings(BaseModel):
-    """Settings for managing virtual devices (emulator/simulator)."""
-
-    autostart: bool = True  # Automatically start a virtual device at the beginning of a session
-    autoshutdown: bool = True  # Automatically stop the device at the end of a session
-
-
 class Settings(BaseSettings):
     """
-    Main class for test configuration settings.
+    Main configuration class for test settings.
 
     Loads values from the following sources:
-    - Environment variables (prefixed with MOBIAUTO_)
+    - Environment variables (with prefix MOBIAUTO_)
     - Initialization values (e.g., from YAML)
     - .env file
     - Secret files
@@ -95,11 +123,12 @@ class Settings(BaseSettings):
     appium: AppiumServer = AppiumServer()  # Appium server configuration
     android: AndroidConfig | None = None  # Android-specific configuration
     ios: IOSConfig | None = None  # iOS-specific configuration
+    proxy: ProxySettings = Field(default_factory=ProxySettings)  # Proxy (mitmproxy) settings
     reporting: ReportingSettings = ReportingSettings()  # Reporting settings
-    capabilities: Capabilities = Capabilities()  # Custom capabilities
+    capabilities: Capabilities = Capabilities()  # User custom capabilities
     virtual_device: VirtualDeviceSettings = Field(
         default_factory=lambda: VirtualDeviceSettings()
-    )  # Configuration for automatic start/stop of virtual devices
+    )  # Settings for auto-start/stop of virtual devices
 
     @classmethod
     def settings_customise_sources(
@@ -111,7 +140,7 @@ class Settings(BaseSettings):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         """
-        Defines the order of configuration sources.
+        Configure the order of configuration sources.
 
         Loading priority:
         1. Environment variables
@@ -120,3 +149,10 @@ class Settings(BaseSettings):
         4. Secret files
         """
         return (env_settings, init_settings, dotenv_settings, file_secret_settings)
+
+
+class VirtualDeviceSettings(BaseModel):
+    """Settings to manage virtual devices (emulator/simulator)."""
+
+    autostart: bool = True  # Automatically start the virtual device at session start
+    autoshutdown: bool = True  # Automatically stop the device at session end

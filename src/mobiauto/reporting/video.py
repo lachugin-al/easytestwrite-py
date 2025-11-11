@@ -9,14 +9,14 @@ from ..utils.cli import run_cmd
 
 class VideoRecorder:
     """
-    Utility class for recording and saving Android emulator/device screen video.
+    Helper class to record and save video from an Android emulator or device screen.
 
     Uses `adb shell screenrecord` to start recording and retrieves the file after stopping.
     """
 
     def __init__(self, out_path: str) -> None:
         """
-        Initialize the VideoRecorder.
+        Initialize VideoRecorder.
 
         Args:
             out_path (str): Path where the recorded video will be saved.
@@ -26,7 +26,7 @@ class VideoRecorder:
 
     def start_android(self, serial: str = "emulator-5554") -> None:
         """
-        Start recording the screen on an Android emulator/device.
+        Start screen recording on an Android emulator or device.
 
         Args:
             serial (str): Device serial (default: "emulator-5554").
@@ -44,7 +44,7 @@ class VideoRecorder:
 
     def stop_android(self, serial: str = "emulator-5554") -> None:
         """
-        Stop recording and pull the recorded video from the device.
+        Stop recording and copy the recorded video from the device.
 
         Args:
             serial (str): Device serial (default: "emulator-5554").
@@ -53,7 +53,7 @@ class VideoRecorder:
         if self.proc is not None and self.proc.poll() is None:
             self.proc.terminate()
 
-        # Attempt to pull the recorded file from the device to local storage
+        # Try to pull the recorded file from the device to local storage
         run_cmd(
             ["adb", "-s", serial, "pull", "/sdcard/test.mp4", str(self.out)],
             check=False,

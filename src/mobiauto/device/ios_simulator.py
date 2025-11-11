@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import time
+from pathlib import Path
 from typing import Any, cast
 
 from ..utils.cli import run_cmd
@@ -28,9 +30,9 @@ class IOSSimulatorManager(EmulatorManager):
 
     def start(self) -> None:
         """
-        Start the iOS simulator.
+        Boot the iOS Simulator.
 
-        Uses the `xcrun simctl boot` command to launch the simulator.
+        Uses `xcrun simctl boot` to start the simulator.
         """
         try:
             self._log.info(
@@ -43,7 +45,7 @@ class IOSSimulatorManager(EmulatorManager):
         run_cmd(["xcrun", "simctl", "boot", self.udid], check=False)
         try:
             self._log.info(
-                "Simulator started",
+                "Simulator boot command issued",
                 action="simulator_started",
                 udid=self.udid,
             )
@@ -55,10 +57,10 @@ class IOSSimulatorManager(EmulatorManager):
         Wait until the simulator is fully booted and ready for use.
 
         Args:
-            timeout (int): Maximum wait time in seconds. Defaults to 120 seconds.
+            timeout (int): Maximum wait time in seconds. Defaults to 120.
 
         Raises:
-            TimeoutError: If the simulator does not respond within the given time.
+            TimeoutError: If the simulator is not ready within the given timeout.
         """
         try:
             self._log.info(
@@ -88,20 +90,137 @@ class IOSSimulatorManager(EmulatorManager):
             time.sleep(2)
         try:
             self._log.error(
-                "Simulator did not become ready within the allotted time",
+                "Simulator did not become ready within the timeout",
                 action="simulator_ready_timeout",
                 udid=self.udid,
                 timeout=timeout,
             )
         except Exception:
             pass
-        raise TimeoutError("iOS simulator did not become ready within the allotted time")
+        raise TimeoutError("iOS Simulator did not become ready within the timeout")
+
+    def _run_netsetup(self, args: list[str], sudo: bool = False) -> subprocess.CompletedProcess:
+        cmd = ["networksetup"] + args
+        if sudo:
+            cmd = ["sudo", "--"] + cmd
+        self._log.debug("networksetup: %s", " ".join(cmd))
+        try:
+            return subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=12)
+        except Exception as e:
+            self._log.warning("networksetup failed: %s", e)
+            return subprocess.CompletedProcess(cmd, 1, stdout="", stderr=str(e))
+
+    def _list_macos_services(self) -> list[str]:
+        try:
+            out = subprocess.check_output(
+                ["networksetup", "-listallnetworkservices"], text=True, stderr=subprocess.DEVNULL
+            )
+            lines = [
+                line.strip()
+                for line in out.splitlines()
+                if line.strip() and not line.startswith("An asterisk")
+            ]
+            lines = [line.lstrip("* ").strip() for line in lines if line.strip()]
+            return lines
+        except Exception:
+            return []
+
+    def apply_proxy(self, host: str, port: int) -> None:
+        """
+        Configure HTTP/HTTPS proxy on macOS for all network services.
+
+        This affects iOS Simulator as it uses the host network.
+        Requires networksetup (macOS) and possibly sudo for some services.
+        """
+        services = self._list_macos_services()
+        if not services:
+            self._log.warning(
+                "networksetup: no network services found - skipping proxy setup for simulator"
+            )
+            return
+        self._log.info("macOS: setting proxy %s:%s for services: %s", host, port, services)
+        sudo_ok = (
+            subprocess.run(
+                ["sudo", "-n", "true"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            ).returncode
+            == 0
+        )
+        for svc in services:
+            self._run_netsetup(["-setwebproxy", svc, host, str(port)], sudo=sudo_ok)
+            self._run_netsetup(["-setsecurewebproxy", svc, host, str(port)], sudo=sudo_ok)
+            # Set local bypass
+            self._run_netsetup(
+                ["-setproxybypassdomains", svc, "localhost", "127.0.0.1", "::1"],
+                sudo=sudo_ok,
+            )
+            self._run_netsetup(["-setwebproxystate", svc, "on"], sudo=sudo_ok)
+            self._run_netsetup(["-setsecurewebproxystate", svc, "on"], sudo=sudo_ok)
+
+    def remove_proxy(self) -> None:
+        services = self._list_macos_services()
+        if not services:
+            return
+        sudo_ok = (
+            subprocess.run(
+                ["sudo", "-n", "true"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            ).returncode
+            == 0
+        )
+        for svc in services:
+            self._run_netsetup(["-setwebproxystate", svc, "off"], sudo=sudo_ok)
+            self._run_netsetup(["-setsecurewebproxystate", svc, "off"], sudo=sudo_ok)
+
+    def install_mitm_ca_if_available(self, mitm_log_dir: str | None) -> None:
+        """
+        Best-effort attempt to install mitmproxy CA into the macOS System keychain
+        so that the simulator trusts MITM certificates.
+
+        Requires sudo / user interaction and may be undesirable in CI.
+        Often it's easier to prepare a simulator image with CA pre-installed.
+        """
+        candidates = []
+        home = Path.home()
+        candidates.append(home / ".mitmproxy" / "mitmproxy-ca-cert.pem")
+        if mitm_log_dir:
+            candidates.append(Path(mitm_log_dir) / "mitmproxy-ca-cert.pem")
+        cert_path = next((p for p in candidates if p.exists()), None)
+        if not cert_path:
+            self._log.warning("mitmproxy CA not found for keychain installation.")
+            return
+
+        self._log.info("Installing mitm CA into System keychain (best-effort): %s", cert_path)
+        try:
+            # Add to System keychain (requires sudo)
+            subprocess.run(
+                [
+                    "sudo",
+                    "security",
+                    "add-trusted-cert",
+                    "-d",
+                    "-r",
+                    "trustRoot",
+                    "-k",
+                    "/Library/Keychains/System.keychain",
+                    str(cert_path),
+                ],
+                check=False,
+            )
+            self._log.info(
+                "CA installation attempt in System keychain completed "
+                "(check permissions/result manually if needed)."
+            )
+        except Exception as e:
+            self._log.exception("Error while installing CA into keychain: %s", e)
 
     def stop(self) -> None:
         """
-        Shut down the iOS simulator.
+        Shut down the iOS Simulator.
 
-        Uses `xcrun simctl shutdown` to gracefully stop the simulator.
+        Uses `xcrun simctl shutdown` for graceful termination.
         """
         try:
             self._log.info(
@@ -118,11 +237,11 @@ def find_simulator_udid_by_name(
     device_name: str, platform_version: str | None = None
 ) -> str | None:
     """
-    Find the UDID of a simulator by its device name.
+    Find simulator UDID by device name.
 
-    If a platform version is specified, attempts to filter
-    iOS runtimes matching that version. Returns the UDID
-    of the first suitable simulator, or None if not found.
+    If platform_version is provided, attempts to filter iOS runtimes
+    matching that version. Returns UDID of the first suitable simulator
+    or None if not found.
     """
     out = run_cmd(["xcrun", "simctl", "list", "--json"], check=False)
     if getattr(out, "returncode", 0) != 0:
@@ -144,8 +263,8 @@ def find_simulator_udid_by_name(
     candidates: list[dict[str, Any]] = []
     for runtime, devs in devices.items():
         if normalized_ver:
-            # Skip runtimes that don't match the version if recognizable
-            # (runtime key may look like "iOS 18.5" or "com.apple.CoreSimulator.SimRuntime.iOS-18-5")
+            # Skip incompatible runtimes if we can parse them
+            # (key may be "iOS 18.5" or "com.apple.CoreSimulator.SimRuntime.iOS-18-5")
             if ("iOS" not in runtime) or (
                 normalized_ver not in runtime and str(platform_version) not in runtime
             ):
@@ -155,7 +274,7 @@ def find_simulator_udid_by_name(
                 candidates.append(d)
 
     if not candidates:
-        # If not found with version filtering, try without it
+        # If nothing found with version filter, try without filtering by version
         if normalized_ver:
             for devs in devices.values():
                 for d in devs:
@@ -170,5 +289,5 @@ def find_simulator_udid_by_name(
         if d.get("state") == "Booted":
             return d.get("udid")
 
-    # Otherwise return the first available
+    # Otherwise, take the first available
     return candidates[0].get("udid")

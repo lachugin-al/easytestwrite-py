@@ -12,7 +12,7 @@ from ..utils.logging import get_logger
 
 class AndroidDriverFactory:
     """
-    Factory class responsible for creating and configuring an instance of the Appium Android WebDriver.
+    Factory class for creating and configuring Appium Android WebDriver instances.
     """
 
     def __init__(self, settings: Settings) -> None:
@@ -20,17 +20,17 @@ class AndroidDriverFactory:
         Initialize the factory with project settings.
 
         Args:
-            settings (Settings): Global application configuration containing Android parameters.
+            settings (Settings): Global configuration with Android parameters.
         """
         self.settings = settings
         self._log = get_logger(__name__)
 
     def build(self, capabilities: Mapping[str, Any]) -> webdriver.Remote:
         """
-        Create and return a configured instance of the Appium Remote WebDriver.
+        Create and return a configured Appium Remote WebDriver instance.
 
         Args:
-            capabilities (Mapping[str, Any]): Additional capabilities to be merged with the base ones.
+            capabilities (Mapping[str, Any]): Extra capabilities merged with base ones.
 
         Returns:
             webdriver.Remote: Configured Appium driver ready for test execution.
@@ -38,7 +38,7 @@ class AndroidDriverFactory:
         s = self.settings
         opts = UiAutomator2Options()
 
-        # --- Configure base Android capabilities ---
+        # --- Configure core Android capabilities ---
         if s.android and s.android.app_path:
             opts.app = s.android.app_path
         if s.android and s.android.udid:
@@ -48,7 +48,7 @@ class AndroidDriverFactory:
         if s.android and s.android.platform_version:
             opts.platform_version = s.android.platform_version
 
-        # --- Set Appium-specific parameters ---
+        # --- Set Appium-specific options ---
         if s.android:
             opts.set_capability("appium:automationName", "UIAutomator2")
             opts.set_capability("platformName", "Android")
@@ -64,17 +64,17 @@ class AndroidDriverFactory:
             if s.android.app_package:
                 opts.set_capability("appium:appPackage", s.android.app_package)
 
-        # --- Merge additional runtime capabilities ---
+        # --- Merge runtime-provided capabilities ---
         for k, v in capabilities.items():
             opts.set_capability(k, v)
 
-        # --- Create and return the WebDriver instance ---
+        # --- Create and return driver instance ---
         executor = str(self.settings.appium.url).rstrip("/")
         self._log.info("Creating Android WebDriver", action="driver_start", executor=executor)
         drv = webdriver.Remote(command_executor=executor, options=opts)
         try:
             self._log.info(
-                "Android WebDriver created",
+                "Android WebDriver is ready",
                 action="driver_ready",
                 session_id=getattr(drv, "session_id", None),
             )

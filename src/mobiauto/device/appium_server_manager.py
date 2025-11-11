@@ -17,7 +17,7 @@ from ..utils.cli import run_cmd
 
 @dataclass(slots=True)
 class _State:
-    """Auxiliary structure for storing Appium process state."""
+    """Helper structure for storing Appium process state."""
 
     proc: object | None = None  # subprocess.Popen | None
     started_by_us: bool = False  # Whether the server was started by this manager
@@ -27,13 +27,13 @@ class _State:
 
 class AppiumServerManager:
     """
-    Manages the lifecycle of a local Appium server process during test runs.
+    Manages the lifecycle of a local Appium server process during test execution.
 
-    Capabilities:
+    Features:
     - Automatically starts Appium before all tests (using host/port from Settings.appium.url)
-    - Checks server readiness via the /status endpoint (and additional ones for compatibility)
+    - Checks server readiness via /status (and compatible endpoints)
     - Monitors server health and automatically restarts it on failure
-    - Gracefully terminates the process after all tests (if it was started by this manager)
+    - Gracefully terminates the process after all tests (if started by this manager)
     """
 
     DEFAULT_POLL_INTERVAL_SEC = 3.0  # Interval between health checks (seconds)
@@ -51,18 +51,19 @@ class AppiumServerManager:
     # ------------------------
     def ensure_started_and_monitored(self, settings: Settings) -> None:
         """
-        Ensure that Appium is running and reachable at the URL from settings.
-        If the server is not running, start a new process and begin monitoring.
-        Re-entrant and safe to call multiple times.
+        Ensure that Appium is running and available at the URL from settings.
+
+        If the server is not running, starts a new process and begins monitoring.
+        Safe to call multiple times.
         """
         with self._lock:
             url = str(settings.appium.url).rstrip("/")
             self._target_url = url
 
-            # Check if a server is already up
+            # Check if an Appium server is already up
             if self._is_healthy(url):
                 self._log.info(
-                    "Appium detected and running — enabling monitoring only",
+                    "Appium is running - monitoring only",
                     url=url,
                     started_by_us=False,
                 )
@@ -70,7 +71,7 @@ class AppiumServerManager:
                 self._start_monitoring(url)
                 return
 
-            # Server is not available — try to start it
+            # Server is not available - try to start it
             host, port = self._parse_host_port(url)
             self._start_process(host, port)
             self._wait_until_healthy(url, timeout=self.START_TIMEOUT_SEC)
@@ -78,14 +79,14 @@ class AppiumServerManager:
 
     def shutdown(self) -> None:
         """
-        Stop monitoring and gracefully terminate the Appium process
+        Stop monitoring and gracefully terminate the Appium process,
         if it was started by this manager.
         """
         with self._lock:
             self._state.shutting_down = True
             try:
                 if self._state.monitor_thread and self._state.monitor_thread.is_alive():
-                    # Interrupt monitor and wait for it to finish (cooperatively)
+                    # Monitoring thread is daemonized; nothing special to do here.
                     pass
             finally:
                 pass
@@ -94,28 +95,27 @@ class AppiumServerManager:
                 p = self._state.proc
                 self._state.proc = None
                 if p is not None and getattr(p, "poll", lambda: None)() is None:
-                    # Process is active — terminate
+                    # Process is still running - terminate
                     self._log.info("Stopping Appium server (started by framework)")
                     try:
-                        # Graceful termination
                         getattr(p, "terminate", lambda: None)()
                     except Exception:
                         pass
 
-                    # Wait up to 5 seconds for it to exit
+                    # Wait up to 5 seconds for graceful shutdown
                     deadline = time.time() + 5
                     while time.time() < deadline and getattr(p, "poll", lambda: 0)() is None:
                         time.sleep(0.1)
 
                     if getattr(p, "poll", lambda: 0)() is None:
-                        self._log.warning("Appium did not exit in time — forcing process kill")
+                        self._log.warning("Appium did not stop in time - forcing process kill")
                         try:
                             getattr(p, "kill", lambda: None)()
                         except Exception:
                             pass
             else:
                 self._log.info(
-                    "Appium was not started by the framework — leaving the process running",
+                    "Appium was not started by framework - leaving process running",
                     started_by_us=False,
                 )
 
@@ -126,7 +126,7 @@ class AppiumServerManager:
     # Helper methods
     # ------------------------
     def _parse_host_port(self, base_url: str) -> tuple[str, int]:
-        """Extract host and port from the Appium server URL."""
+        """Extract host and port from Appium server URL."""
         pr = urlparse(base_url)
         host = pr.hostname or "127.0.0.1"
         port = pr.port or (443 if pr.scheme == "https" else 80)
@@ -134,8 +134,9 @@ class AppiumServerManager:
 
     def _is_healthy(self, base_url: str) -> bool:
         """
-        Check that the Appium server responds with a 2xx code on one of the known endpoints.
-        Used to verify availability (/status, /sessions, and /).
+        Check that Appium server responds with 2xx on one of the known endpoints.
+
+        Used to validate availability (/status, /sessions, /).
         """
         base = base_url.rstrip("/")
         for ep in ("/status", "/sessions", "/"):
@@ -145,7 +146,7 @@ class AppiumServerManager:
                 with urlopen(req, timeout=3) as resp:  # nosec - controlled URL
                     code = resp.getcode() or 0
                     if 200 <= code < 300:
-                        # Attempt to parse JSON from /status for readiness logging
+                        # Try to parse JSON from /status for readiness logging
                         try:
                             raw = resp.read() or b""
                             if raw:
@@ -155,9 +156,13 @@ class AppiumServerManager:
                                     and isinstance(data.get("value"), dict)
                                     and bool(data["value"].get("ready", True))
                                 )
-                                self._log.debug("Appium status check", endpoint=ep, ready=ready)
+                                self._log.debug(
+                                    "Appium status check",
+                                    endpoint=ep,
+                                    ready=ready,
+                                )
                         except Exception:
-                            # JSON errors are non-critical — a 2xx is sufficient
+                            # JSON errors are non-critical; 2xx is enough
                             pass
                         return True
             except URLError:
@@ -167,15 +172,15 @@ class AppiumServerManager:
         return False
 
     def _wait_until_healthy(self, url: str, *, timeout: int) -> None:
-        """Wait until Appium becomes available within the given timeout."""
+        """Wait until Appium becomes healthy within the given timeout."""
         deadline = time.time() + timeout
         while time.time() < deadline:
             if self._is_healthy(url):
-                self._log.info("Appium is ready for use", url=url)
+                self._log.info("Appium is ready to use", url=url)
                 return
             time.sleep(0.5)
 
-        # If the server didn't become available — stop the process to avoid a zombie
+        # If server never became healthy — kill the process to avoid "zombie"
         if self._state.started_by_us and self._state.proc is not None:
             try:
                 getattr(self._state.proc, "kill", lambda: None)()
@@ -184,7 +189,7 @@ class AppiumServerManager:
         raise RuntimeError(f"Failed to start Appium at {url} within {timeout} seconds")
 
     def _shell_prefix(self) -> list[str]:
-        """Return the system shell command used to launch Appium (bash/cmd)."""
+        """Return the system command prefix used to start Appium (bash/cmd)."""
         if os.name == "nt":
             return ["cmd", "/c"]
         return ["bash", "-lc"]
@@ -192,7 +197,8 @@ class AppiumServerManager:
     def _start_process(self, host: str, port: int) -> None:
         """
         Start the Appium process and store a reference to it.
-        Creates the logs directory if it doesn't exist.
+
+        Creates a directory for logs if it does not exist.
         """
         log_dir = os.path.join("artifacts")
         try:
@@ -201,9 +207,9 @@ class AppiumServerManager:
             pass
         log_file = os.path.join(log_dir, "appium-server.log")
 
-        # Start the Appium process via `exec` —
+        # Start Appium process via `exec` —
         # this ensures terminate/kill signals are delivered directly to Appium
-        # and the process exits cleanly when stopped.
+        # and the process exits correctly on shutdown.
         cmd = f"exec appium --address {host} --port {port} >> {log_file} 2>&1"
         args = self._shell_prefix() + [cmd]
         p = run_cmd(args, spawn=True)
@@ -214,7 +220,7 @@ class AppiumServerManager:
         self._log.info("Starting Appium server", host=host, port=port, pid=pid, log=log_file)
 
     def _start_monitoring(self, url: str) -> None:
-        """Start a background thread to monitor Appium health."""
+        """Start background monitoring thread for Appium health."""
         if self._state.monitor_thread and self._state.monitor_thread.is_alive():
             return
 
@@ -229,8 +235,9 @@ class AppiumServerManager:
 
     def _monitor_loop(self, url: str) -> None:
         """
-        Background Appium monitoring loop:
-        - Checks process liveness and the /status endpoint.
+        Background monitoring loop for Appium:
+
+        - Checks process liveness and /status endpoint.
         - Restarts the server after repeated failures.
         """
         failures = 0
@@ -249,7 +256,7 @@ class AppiumServerManager:
 
                 if failures >= self.FAILURE_THRESHOLD and not self._state.shutting_down:
                     self._log.warning(
-                        "Appium health issues detected — restarting",
+                        "Appium health issues detected - restarting server",
                         failures=failures,
                     )
                     # Stop current process
@@ -277,10 +284,10 @@ class AppiumServerManager:
                         self._log.error("Failed to restart Appium", error=str(e))
                 time.sleep(self.DEFAULT_POLL_INTERVAL_SEC)
             except Exception as e:
-                # Never exit the loop silently
+                # Never silently exit the monitoring loop
                 self._log.error("Error in monitoring loop", error=str(e))
                 time.sleep(self.DEFAULT_POLL_INTERVAL_SEC)
 
 
-# Global instance for convenient use in fixtures
+# Global instance for convenient usage in fixtures
 manager = AppiumServerManager()

@@ -13,12 +13,11 @@ from structlog.contextvars import bind_contextvars, clear_contextvars, merge_con
 _LOG_DIR = Path("artifacts/logs")
 _FRAMEWORK_LOG = _LOG_DIR / "framework.log"
 
-# Context keys that will automatically be included in logs
+# Context keys that will be automatically included into log records
 _CONTEXT_KEYS = ("platform", "device", "test", "session_id")
 
 
 def _ensure_log_dir() -> None:
-    """Ensure that the log directory exists."""
     try:
         _LOG_DIR.mkdir(parents=True, exist_ok=True)
     except Exception:
@@ -26,12 +25,12 @@ def _ensure_log_dir() -> None:
 
 
 def _level_from_env() -> int:
-    """Get the log level from MOBIAUTO_LOG_LEVEL (TRACE|DEBUG|INFO|WARNING|ERROR)."""
+    """Get log level from MOBIAUTO_LOG_LEVEL (TRACE|DEBUG|INFO|WARNING|ERROR)."""
     import logging
 
     raw = os.getenv("MOBIAUTO_LOG_LEVEL", "INFO").upper()
     if raw == "TRACE":
-        # Level below DEBUG — use a numeric value smaller than DEBUG
+        # Level below DEBUG — use numeric value less than DEBUG
         return 5
     return getattr(logging, raw, logging.INFO)
 
@@ -42,7 +41,7 @@ _file_lock = threading.RLock()
 def _copy_event_to_message(
     logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
 ) -> Mapping[str, Any]:
-    # For consistency, add a "message" field as a copy of the standard "event"
+    # For consistency add "message" field as a copy of standard "event" field
     if "event" in event_dict and "message" not in event_dict:
         event_dict["message"] = event_dict["event"]
     return event_dict
@@ -51,7 +50,6 @@ def _copy_event_to_message(
 def _drop_none_values(
     logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
 ) -> Mapping[str, Any]:
-    """Remove all keys with None values from the log event."""
     return {k: v for k, v in event_dict.items() if v is not None}
 
 
@@ -59,13 +57,13 @@ def _file_sink_processor(
     logger: Any, method_name: str, event_dict: MutableMapping[str, Any]
 ) -> MutableMapping[str, Any]:
     """
-    Processor that duplicates log entries into files:
-    - artifacts/logs/framework.log — all events
-    - artifacts/logs/test_<name>.log — events for the current test (if a test context is present)
+    Processor that duplicates log records into files:
+    - artifacts/logs/framework.log      — all events
+    - artifacts/logs/test_<name>.log    — events for the current test (if test context is present)
     """
     _ensure_log_dir()
 
-    # Prepare a JSON string in advance to ensure consistent writes to both files
+    # Prepare JSON line once so we can write the same data to both files
     line = json.dumps(event_dict, ensure_ascii=False)
 
     test_name = event_dict.get("test") or event_dict.get("test_name")
@@ -82,16 +80,19 @@ def _file_sink_processor(
                 with Path(test_path).open("a", encoding="utf-8") as f:
                     f.write(line + "\n")
     except Exception:
-        # Never fail due to log writing issues
+        # Never break execution because of log write issues
         pass
 
     return event_dict
 
 
 def current_test_log_path(test_name: str | None = None) -> Path:
-    """Return the path to the current test’s log file (or the expected test), if its name is known."""
+    """
+    Return path to the current test log file (or the expected one), if its name is known.
+
+    If test_name is not provided, returns the common framework log file path.
+    """
     _ensure_log_dir()
-    # If no test name is provided, return the global log file
     if not test_name:
         return _FRAMEWORK_LOG
 
@@ -100,9 +101,16 @@ def current_test_log_path(test_name: str | None = None) -> Path:
 
 
 def bind_context(
-    *, settings: Any | None = None, driver: Any | None = None, test_name: str | None = None
+    *,
+    settings: Any | None = None,
+    driver: Any | None = None,
+    test_name: str | None = None,
 ) -> None:
-    """Bind logging context variables with platform/device/test/session information."""
+    """
+    Bind platform/device/test/session info into the logging context.
+
+    This data is then automatically included in all structured log records.
+    """
     platform = None
     device = None
     session_id = None
@@ -131,13 +139,15 @@ _CONFIGURED = False
 
 def setup_logging() -> None:
     """
-    Centralized setup for structured logging with JSON output and file duplication.
+    Centralized setup of structured logging with JSON output and file duplication.
 
     Includes:
     - Log level from MOBIAUTO_LOG_LEVEL
-    - ISO 8601 timestamp (key: timestamp)
+    - ISO 8601 timestamp (key: "timestamp")
     - Context (platform, device, test, session_id) via contextvars
-    - Duplication of every record into artifacts/logs/framework.log and test_<name>.log
+    - Duplication of each record into:
+        artifacts/logs/framework.log
+        artifacts/logs/test_<name>.log
     - Unified JSON format printed to stdout (compatible with existing unit tests)
     """
     import logging
@@ -147,11 +157,12 @@ def setup_logging() -> None:
         return
 
     _ensure_log_dir()
+
     level = _level_from_env()
 
     structlog.configure(
         processors=[
-            merge_contextvars,  # Automatically inject bound context
+            merge_contextvars,  # Automatically include bound context
             structlog.processors.add_log_level,
             structlog.processors.TimeStamper(fmt="iso", key="timestamp"),
             structlog.processors.CallsiteParameterAdder(
@@ -159,28 +170,31 @@ def setup_logging() -> None:
             ),
             _copy_event_to_message,
             _drop_none_values,
-            _file_sink_processor,  # Duplicate logs into file(s)
+            _file_sink_processor,  # Duplicate record into log file(s)
             structlog.processors.JSONRenderer(),
         ],
-        logger_factory=structlog.PrintLoggerFactory(),  # Output to stdout (test compatible)
+        logger_factory=structlog.PrintLoggerFactory(),  # output to stdout (test-friendly)
         wrapper_class=structlog.make_filtering_bound_logger(level),
         cache_logger_on_first_use=True,
     )
 
-    # Synchronize level with standard logging (for third-party libraries)
+    # Sync root logging level (for third-party libraries)
     logging.getLogger().setLevel(level)
 
     _CONFIGURED = True
 
 
 def get_logger(name: str | None = None) -> Any:
-    """Return a configured structlog logger; auto-configures logging if not yet initialized."""
-    # Ensure logging is configured even in standalone unit tests
+    """
+    Get a structlog logger instance.
+
+    Ensures logging is configured even in plain unit-test runs without the pytest plugin.
+    """
     if not globals().get("_CONFIGURED", False):
         try:
             setup_logging()
         except Exception:
-            # Never block execution due to configuration problems
+            # Do not interfere with execution if configuration fails
             pass
     return structlog.get_logger(name or __name__)
 

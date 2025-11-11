@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "mobile-automation"
-version = "0.1.0"
-description = "Mobile app automation: pytest + Appium v3"
+version = "0.2.0"
+description = "Mobile app automation: pytest + Appium v3 + mitmproxy"
 authors = ["Anton Lachugin <anton.lachugin.l@gmail.com>"]
 packages = [{ include = "mobiauto", from = "src" }]
 
@@ -19,6 +19,7 @@ tenacity = "^9.0"
 typer = "^0.12"
 PyYAML = "^6.0"
 types-pyyaml = "^6.0.12"
+mitmproxy = "^12.2.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.8"

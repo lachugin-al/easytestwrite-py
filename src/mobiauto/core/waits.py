@@ -14,12 +14,12 @@ from ..reporting.manager import ReportManager
 from ..utils.logging import get_logger
 from .locators import PageElement, StrategyValue, pretty_locator, resolve_to_selenium
 
-# ---- Defaults ----
+# ---- Default values ----
 DEFAULT_TIMEOUT_BEFORE_EXPECTATION = 0
 DEFAULT_TIMEOUT_EXPECTATION = 20
 DEFAULT_POLLING_INTERVAL_MS = 500
 DEFAULT_SCROLL_COUNT = 0
-DEFAULT_SCROLL_CAPACITY = 0.7  # Value in the range 0..1
+DEFAULT_SCROLL_CAPACITY = 0.7  # Value in range 0..1
 DEFAULT_SCROLL_DIRECTION: Literal["up", "down", "left", "right"] = "down"
 
 _log = get_logger(__name__)
@@ -27,10 +27,10 @@ _log = get_logger(__name__)
 
 class Waits:
     """
-    Helper class providing wait mechanisms for UI elements.
+    Helper class providing waiting mechanisms for UI elements.
 
-    Supports scrolling waits, customizable polling,
-    and verifying that a certain set of elements is visible.
+    Supports waiting with scrolling, configurable polling,
+    and validation that a certain set of elements is visible.
     """
 
     @staticmethod
@@ -47,16 +47,16 @@ class Waits:
         scroll_direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
     ) -> WebElement:
         """
-        Wait for a visible element and return the N-th visible one (1-based).
+        Wait for a visible element and return the N-th visible one (1-based index).
 
         Args:
             driver (WebDriver): Selenium/Appium driver instance.
-            target (PageElement | StrategyValue): Locator to search.
+            target (PageElement | StrategyValue): Locator to search for.
             index (int, optional): Index of the element to return (1-based). Defaults to 1.
-            settle_for (float): Wait before starting the search (to stabilize the UI).
-            timeout (float): Max time to wait for the element.
+            settle_for (float): Wait before starting the search (to stabilize UI).
+            timeout (float): Maximum wait time.
             polling_ms (int): Polling interval in milliseconds.
-            max_scrolls (int): Max number of scroll attempts if the element is not found.
+            max_scrolls (int): Maximum number of scroll attempts if element is not found.
             scroll_percent (float): Portion of the screen to scroll (0..1).
             scroll_direction (Literal): Scroll direction (default "down").
 
@@ -64,7 +64,7 @@ class Waits:
             WebElement: The found element.
 
         Raises:
-            NoSuchElementException: If the element is not found within the time limit and after scrolling.
+            NoSuchElementException: If the element is not found within timeout and after scrolling.
         """
         loc = pretty_locator(driver, target)
         title = (
@@ -72,7 +72,7 @@ class Waits:
             f"(timeout={timeout}s, polling={polling_ms}ms, scrolls={max_scrolls})"
         )
         with allure.step(title):
-            # Technical wait logging
+            # Technical logging of wait parameters
             _log.debug(
                 "Waiting for element",
                 action="wait",
@@ -123,7 +123,7 @@ class Waits:
                             failed.append(t)
                             continue
 
-                    # If allowed — scroll and try again
+                    # If allowed — perform scroll and retry
                     if max_scrolls > 0 and current_scroll < max_scrolls:
                         _perform_scroll(
                             driver, count=1, capacity=scroll_percent, direction=scroll_direction
@@ -139,14 +139,14 @@ class Waits:
                         )
                         continue
 
-                    # Build debug info for the error message
+                    # Build debug info for error message
                     locators_info = (
-                        f"The following locators {failed} out of {attempted} were not found."
+                        f"The following locators {failed} from {attempted} were not found."
                         if failed
                         else (
                             f"Attempts were made to find the following locators: {attempted}"
                             if attempted
-                            else "There were no attempts to search for locators"
+                            else "No locator search attempts were made"
                         )
                     )
                     if last_exc is not None:
@@ -161,7 +161,8 @@ class Waits:
                         )
                         raise NoSuchElementException(
                             f"Elements were not found within '{timeout}' seconds after "
-                            f"'{current_scroll}' scrolls. {locators_info}. Original error: {last_exc}"
+                            f"'{current_scroll}' scroll(s). {locators_info}. "
+                            f"Original error: {last_exc}"
                         ) from last_exc
                     _log.error(
                         "Element not found",
@@ -173,10 +174,10 @@ class Waits:
                     )
                     raise NoSuchElementException(
                         f"Elements were not found within '{timeout}' seconds after "
-                        f"'{current_scroll}' scrolls. {locators_info}"
+                        f"'{current_scroll}' scroll(s). {locators_info}"
                     )
             except Exception:
-                # On wait failure — attach artifacts centrally
+                # On wait step failure — attach artifacts centrally
                 ReportManager.get_default().attach_artifacts_on_failure(driver)
                 raise
 
@@ -199,7 +200,7 @@ class Waits:
         Useful for optional elements whose absence is non-critical.
 
         Returns:
-            WebElement | None: The found element or None if not found.
+            WebElement | None: Found element or None if not found.
         """
         try:
             return Waits.wait_for_elements(
@@ -222,7 +223,7 @@ def _nth_visible_condition(
     t: StrategyValue, n: int
 ) -> Callable[[WebDriver], list[WebElement] | bool]:
     """
-    Create a function for WebDriverWait.until that returns a list of visible elements
+    Create a WebDriverWait.until predicate that returns the list of visible elements
     when at least `n` are visible; otherwise returns False.
     """
 
@@ -238,7 +239,7 @@ def _nth_visible_condition(
 
 
 def _is_displayed_safe(el: WebElement) -> bool:
-    """Safely check if an element is displayed, ignoring exceptions."""
+    """Safely check if element is displayed, ignoring exceptions."""
     try:
         return bool(el.is_displayed())
     except Exception:
@@ -266,8 +267,9 @@ def _any_visible(tuples: Sequence[StrategyValue]) -> Callable[[WebDriver], WebEl
 
 def _wait_for_ui_stability(driver: WebDriver, timeout_seconds: float, polling_ms: int) -> None:
     """
-    Wait until the UI stabilizes (page source stops changing), or until the timeout expires.
-    Useful to avoid races after navigation or animations.
+    Wait until the UI stabilizes (page source stops changing), or timeout elapses.
+
+    Useful to avoid race conditions after navigation or animations.
     """
     end = time.monotonic() + timeout_seconds
     previous: str | None = None
@@ -289,12 +291,12 @@ def _perform_scroll(
     direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
 ) -> None:
     """
-    Perform a scroll gesture via the Appium `mobile: scrollGesture` endpoint.
+    Perform a scroll gesture via Appium `mobile: scrollGesture` endpoint.
 
     Args:
         driver (WebDriver): Appium driver.
         count (int): Number of scroll attempts.
-        capacity (float): Percentage of the screen to scroll (0..1).
+        capacity (float): Portion of the screen to scroll (0..1).
         direction (Literal): Scroll direction.
     """
     capacity = min(max(capacity, 0.01), 1.0)

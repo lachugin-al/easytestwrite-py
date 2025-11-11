@@ -12,7 +12,7 @@ from ..utils.logging import get_logger
 
 class IOSDriverFactory:
     """
-    Factory class responsible for creating and configuring an instance of the Appium iOS WebDriver.
+    Factory class for creating and configuring Appium iOS WebDriver instances.
     """
 
     def __init__(self, settings: Settings) -> None:
@@ -20,25 +20,25 @@ class IOSDriverFactory:
         Initialize the factory with project settings.
 
         Args:
-            settings (Settings): Global application configuration containing iOS parameters.
+            settings (Settings): Global configuration with iOS-related parameters.
         """
         self.settings = settings
         self._log = get_logger(__name__)
 
     def build(self, capabilities: Mapping[str, Any]) -> webdriver.Remote:
         """
-        Create and return a configured instance of the Appium Remote WebDriver for iOS.
+        Create and return a configured Appium Remote WebDriver instance for iOS.
 
         Args:
-            capabilities (Mapping[str, Any]): Additional capabilities to be merged with the base ones.
+            capabilities (Mapping[str, Any]): Extra capabilities to be merged with base ones.
 
         Returns:
-            webdriver.Remote: Configured Appium driver ready for test execution.
+            webdriver.Remote: Configured Appium WebDriver ready to run tests.
         """
         s = self.settings
         opts = XCUITestOptions()
 
-        # --- Configure base iOS capabilities ---
+        # --- Core iOS capabilities ---
         if s.ios and s.ios.app_path:
             opts.app = s.ios.app_path
         if s.ios and s.ios.bundle_id:
@@ -50,7 +50,7 @@ class IOSDriverFactory:
         if s.ios and s.ios.platform_version:
             opts.platform_version = s.ios.platform_version
 
-        # --- Set Appium-specific parameters ---
+        # --- Appium-specific settings ---
         if s.ios:
             opts.set_capability("appium:automationName", "XCUITest")
             opts.set_capability("platformName", "iOS")
@@ -63,14 +63,14 @@ class IOSDriverFactory:
             if s.ios.process_arguments:
                 opts.set_capability("processArguments", s.ios.process_arguments)
 
-            # Custom timeout to speed up or slow down XCTest snapshots
+            # Custom timeout for speeding up or slowing down XCTest snapshots
             opts.set_capability("settings[customSnapshotTimeout]", s.ios.custom_snapshot_timeout)
 
-        # --- Merge additional runtime capabilities ---
+        # --- Merge runtime-provided capabilities ---
         for k, v in capabilities.items():
             opts.set_capability(k, v)
 
-        # --- Create and return the WebDriver instance ---
+        # --- Create and return the driver instance ---
         executor = str(self.settings.appium.url).rstrip("/")
         self._log.info("Creating iOS WebDriver", action="driver_start", executor=executor)
         drv = webdriver.Remote(command_executor=executor, options=opts)

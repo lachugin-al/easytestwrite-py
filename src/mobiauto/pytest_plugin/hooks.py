@@ -5,32 +5,32 @@ from typing import Any
 
 import allure
 
-from ..utils.logging import current_test_log_path
+from mobiauto.utils.logging import current_test_log_path
 
 
 def pytest_runtest_makereport(item: Any, call: Any) -> None:
     """
     Pytest hook: called after each test phase (setup, call, teardown).
 
-    When the main test phase (call) fails, attaches the tail of the current test’s
-    log file to the Allure report to speed up failure analysis.
+    When the main test phase (call) fails, attaches the tail of the current test logs
+    to the Allure report to speed up debugging.
     """
     try:
-        # We are only interested in the main test execution phase
+        # We are only interested in the actual test function phase
         if getattr(call, "when", None) != "call":
             return
         failed = getattr(call, "excinfo", None) is not None
         if not failed:
             return
 
-        # Determine the log file path for the current test
+        # Resolve log file path for the current test
         path = current_test_log_path(getattr(item, "name", None))
         content = ""
         try:
             if os.path.exists(path):
                 with open(path, encoding="utf-8", errors="ignore") as f:
                     lines = f.readlines()
-                    # Take the last 200 lines to avoid overloading the report
+                    # Take last 200 lines to avoid overloading the report
                     content = "".join(lines[-200:])
         except Exception:
             content = ""
@@ -39,12 +39,12 @@ def pytest_runtest_makereport(item: Any, call: Any) -> None:
             try:
                 allure.attach(
                     content,
-                    name="Recent Logs",
+                    name="Recent logs",
                     attachment_type=allure.attachment_type.TEXT,
                 )
             except Exception:
-                # Never interrupt test execution due to Allure attachment issues
+                # Do not interfere with test execution due to Allure issues
                 pass
     except Exception:
-        # Never fail due to errors in the hook itself
+        # Never fail due to errors inside the hook itself
         pass

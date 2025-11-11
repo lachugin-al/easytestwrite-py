@@ -1,16 +1,18 @@
 
 platform: ios
-appium:
-  url: http://127.0.0.1:4723/
+
+virtual_device:
+  autostart: true
+  autoshutdown: true
 
 ios:
-  device_name: "iPhone 16 Plus"
-  platform_version: "18.5"
+  device_name: "iPhone 16e"
+  platform_version: "26.1"
   app_path: /path/to/your/.app
   bundle_id: COM.DEV
   connect_hardware_keyboard: false
   auto_accept_alerts: false
-  auto_dismiss_alerts: false
+  auto_dismiss_alerts: true
   show_ios_log: false
   auto_launch: true
   process_arguments: {}
@@ -18,6 +20,23 @@ ios:
 
 reporting:
   allure_dir: artifacts/allure
+  screenshots_on_fail: true
+  screenshots_on_success: true
+  page_source_on_fail: true
+  page_source_on_success: true
 
 capabilities:
   raw: {}
+
+proxy:
+  enabled: true
+  mitm_args:
+    - --set
+    - connection_strategy=lazy
+    - --set
+    - block_global=false
+    - --allow-hosts
+    - ^(.*\.)?a\.wb\.ru:.*$
+  mitm_bin: "mitmdump"
+  strict: true
+  install_ca: false

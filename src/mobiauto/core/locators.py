@@ -1,10 +1,13 @@
+# src/mobiauto/core/locators.py
 from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
-# --- Supported locator strategies and raw locator types ---
+from ..utils.platform import get_platform_from_driver
+
+# --- Supported locator strategies and "raw" locator types ---
 Strategy = Literal[
     "id",
     "accessibility id",
@@ -18,9 +21,9 @@ StrategyValue = tuple[Strategy, str]
 
 # -------- Factory functions (by_*) return StrategyValue --------
 def _require(v: str | None, what: str) -> str:
-    """Ensure that the locator value is not None, otherwise raise an error."""
+    """Ensure that locator value is not None, otherwise raise an error."""
     if v is None:
-        raise ValueError(f"Locator for {what} is not provided and is null.")
+        raise ValueError(f"Locator by {what} is not specified and is null.")
     return v
 
 
@@ -109,7 +112,7 @@ def by_ios_predicate_string(v: str | None) -> StrategyValue:
 class PageElement:
     """
     Represents a cross-platform locator that can include platform-specific strategies.
-    Allows retrieving one or multiple locators depending on the platform.
+    Allows obtaining one or multiple locators depending on the platform.
     """
 
     android: StrategyValue | None = None
@@ -119,16 +122,16 @@ class PageElement:
 
     def get(self, platform: str) -> StrategyValue:
         """
-        Get a single locator for the specified platform.
+        Get a single locator for the given platform.
 
         Args:
             platform (str): "android" or "ios"
 
         Returns:
-            StrategyValue: A tuple (strategy, value)
+            StrategyValue: Tuple of the form (strategy, value)
 
         Raises:
-            ValueError: If the locator for the specified platform is not provided.
+            ValueError: If locator for the given platform is not specified.
         """
         p = (platform or "").lower()
         if p == "android":
@@ -136,18 +139,18 @@ class PageElement:
                 return self.android
             if self.android_list:
                 return self.android_list[0]
-            raise ValueError("Locator for Android is not provided")
+            raise ValueError("Locator for Android is not specified")
         if p == "ios":
             if self.ios:
                 return self.ios
             if self.ios_list:
                 return self.ios_list[0]
-            raise ValueError("Locator for iOS is not provided")
+            raise ValueError("Locator for iOS is not specified")
         raise ValueError(f"Unknown platform: {p}")
 
     def get_all(self, platform: str) -> list[StrategyValue]:
         """
-        Get all locators for the specified platform.
+        Get all locators for the given platform.
 
         Args:
             platform (str): "android" or "ios"
@@ -170,7 +173,7 @@ class PageElement:
             return []
         raise ValueError(f"Unknown platform: {p}")
 
-    # Convenient factory methods
+    # Convenience factory methods
     @staticmethod
     def by_accessibility_id(acc_id: str) -> PageElement:
         loc = by_accessibility_id(acc_id)
@@ -216,24 +219,9 @@ class PageElement:
 
 
 # ---------- Helper functions ----------
-def get_platform_from_driver(driver: Any) -> str:
-    """
-    Extract the platform name from driver capabilities.
-
-    Args:
-        driver (Any): Appium/Selenium driver instance.
-
-    Returns:
-        str: Platform name in lowercase ("android" or "ios").
-    """
-    caps = getattr(driver, "capabilities", None) or {}
-    platform = (caps.get("platformName") or caps.get("appium:platformName") or "").lower()
-    return platform
-
-
 def resolve_to_selenium(driver: Any, locator: StrategyValue | PageElement) -> list[StrategyValue]:
     """
-    Normalize a locator into a list of (strategy, value) tuples,
+    Normalize locator into a list of (strategy, value) tuples,
     resolving platform-specific locators if a PageElement is provided.
 
     Args:
@@ -241,7 +229,7 @@ def resolve_to_selenium(driver: Any, locator: StrategyValue | PageElement) -> li
         locator (StrategyValue | PageElement): Raw locator tuple or PageElement.
 
     Returns:
-        list[StrategyValue]: List of locators suitable for WebDriver search operations.
+        list[StrategyValue]: List of locator tuples suitable for WebDriver find operations.
 
     Raises:
         TypeError: If locator is neither StrategyValue nor PageElement.
@@ -260,7 +248,7 @@ def resolve_to_selenium(driver: Any, locator: StrategyValue | PageElement) -> li
     raise TypeError("Unsupported locator type: expected StrategyValue or PageElement")
 
 
-# ---------- Step formatting utilities ----------
+# ---------- Utilities for formatting steps ----------
 def format_strategy_value(sv: StrategyValue) -> str:
     """
     Return a human-readable representation of a locator as "strategy: value".
@@ -276,12 +264,12 @@ def format_strategy_value(sv: StrategyValue) -> str:
 def pretty_locator(driver: Any, locator: StrategyValue | PageElement) -> str:
     """
     Convert StrategyValue or PageElement into a string for Allure reports.
-    If multiple locators (alternatives) exist, join them with " | ".
+    If multiple locators (alternatives) are present, join them with " | ".
     """
     try:
         tuples = resolve_to_selenium(driver, locator)
     except Exception:
-        # In case of locator resolution errors - fallback to str(locator)
+        # In case of errors resolving the locator — just use str(locator)
         return str(locator)
     formatted = [format_strategy_value(t) for t in tuples]
     return " | ".join(formatted)

@@ -3,14 +3,19 @@ import pytest
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     """
-    Register custom CLI options for pytest.
+    Registers custom command-line (CLI) options for pytest.
 
-    Adds options for configuring the test run:
-    --config <path>    : Path to YAML configuration file.
-    --platform <name>  : Override platform ("android" or "ios").
+    Adds options to configure test execution:
+      --config <path>    : Path to the YAML configuration file.
+      --platform <name>  : Platform override ("android" or "ios").
 
-    These options are used by fixtures in conftest.py to load settings dynamically.
+    These options are used by fixtures in conftest.py to dynamically load settings.
     """
     g = parser.getgroup("mobiauto")
-    g.addoption("--config", action="store", default=None, help="Path to YAML config")
-    g.addoption("--platform", action="store", default=None, help="android|ios override")
+    g.addoption("--config", action="store", default=None, help="Path to YAML configuration file")
+    g.addoption(
+        "--platform",
+        action="store",
+        default=None,
+        help="Platform override: android|ios",
+    )

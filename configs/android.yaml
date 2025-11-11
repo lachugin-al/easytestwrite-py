@@ -1,13 +1,15 @@
 
 platform: android
-appium:
-  url: http://127.0.0.1:4723/
+
+virtual_device:
+  autostart: true
+  autoshutdown: true
 
 android:
-  device_name: Pixel_XL
+  device_name: "Pixel_XL"
   platform_version: "16"
   app_path: /path/to/your/.apk
-  app_activity: com.MainActivity
+  app_activity: .MainActivity
   app_package: com.dev
   no_reset: false
   new_command_timeout: 100
@@ -19,7 +21,24 @@ android:
 
 reporting:
   allure_dir: artifacts/allure
+  screenshots_on_fail: true
+  screenshots_on_success: true
+  page_source_on_fail: true
+  page_source_on_success: true
 
 capabilities:
   raw:
     appium:newCommandTimeout: 120
+
+proxy:
+  enabled: true
+  mitm_args:
+    - --set
+    - connection_strategy=lazy
+    - --set
+    - block_global=false
+    - --allow-hosts
+    - ^(.*\.)?a\.wb\.ru:.*$
+  mitm_bin: "mitmdump"
+  strict: true
+  install_ca: false

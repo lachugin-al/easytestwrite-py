@@ -7,8 +7,8 @@ class EmulatorManager(ABC):
     """
     Abstract base class for emulator managers.
 
-    Defines the required interface for starting, stopping,
-    and waiting for readiness of any emulator implementation.
+    Defines the required interface to start, stop,
+    and wait for readiness for any emulator implementation.
     """
 
     @abstractmethod
@@ -16,8 +16,8 @@ class EmulatorManager(ABC):
         """
         Start the emulator process.
 
-        Implementations should spawn or initialize the emulator
-        in a way that allows further interaction.
+        Implementations must spawn or initialize the emulator
+        in a way that allows further interaction with it.
         """
         ...
 
@@ -26,7 +26,7 @@ class EmulatorManager(ABC):
         """
         Stop the running emulator instance.
 
-        Implementations should gracefully terminate the emulator process.
+        Implementations must gracefully terminate the emulator process.
         """
         ...
 
@@ -36,6 +36,6 @@ class EmulatorManager(ABC):
         Wait until the emulator is fully ready for use.
 
         Args:
-            timeout (int): Maximum wait time in seconds (defaults to 120).
+            timeout (int): Maximum wait time in seconds (default: 120).
         """
         ...
