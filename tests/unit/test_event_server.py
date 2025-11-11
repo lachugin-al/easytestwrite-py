@@ -33,16 +33,16 @@ def test_health_ok(event_server: str) -> None:
 
 def test_batch_ingest_saves_events(event_server: str, events: EventStore) -> None:
     payload = {
-        "meta": {"locale": "ru-RU"},
+        "meta": {"locale": "en-ES"},
         "events": [
             {
-                "name": "Header_T",
+                "name": "Example_1",
                 "event_time": "2025-10-26T09:55:27.684+01:00",
                 "event_num": 44,
                 "data": {"x": 1},
             },
             {
-                "name": "Carousel_T",
+                "name": "Example_2",
                 "event_time": "2025-10-26T09:55:30.043+01:00",
                 "event_num": 45,
                 "data": {"y": 2},
