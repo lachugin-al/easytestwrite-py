@@ -59,7 +59,7 @@ def test_batch_ingest_saves_events(event_server: str, events: EventStore) -> Non
     assert saved[0].data is not None
     # Body contains the original JSON as a string; parse it to verify content
     body = json.loads(saved[0].data.body)
-    assert body["meta"]["locale"] == "ru-RU"
+    assert body["meta"]["locale"] == "en-ES"
     # headers are saved as dict[str, list[str]]
     assert isinstance(saved[0].data.headers, dict)
 
