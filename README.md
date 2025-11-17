@@ -18,7 +18,7 @@ A lightweight, opinionated template for mobile UI automation with Pytest, Appium
 - Build/packaging: Poetry
 - Test framework: pytest (+ pytest-xdist, pytest-rerunfailures, pytest-cov)
 - CLI: Typer (console script `mobiauto`)
-- Mobile automation: `appium-python-client` ^4.x (Appium Server 2.x expected)
+- Mobile automation: `appium-python-client` ^4.x (Appium Server 3.x expected)
 - Config: Pydantic v2 + pydantic-settings, YAML
 - Logging: structlog
 - Proxy: mitmproxy
@@ -29,7 +29,7 @@ A lightweight, opinionated template for mobile UI automation with Pytest, Appium
 - Poetry
 - For Android: Java JDK, Android SDK/Platform Tools, an emulator or real device
 - For iOS: Xcode + simulators; proper signing for real devices
-- Appium Server 2.x available in PATH as `appium` (or running elsewhere and configured via URL)
+- Appium Server 3.x available in PATH as `appium` (or running elsewhere and configured via URL)
   - Install example: `npm i -g appium` and install drivers you need (e.g., `@appium/driver-uiautomator2`, `@appium/driver-xcuitest`)
 - Optional: Allure CLI to view reports locally
 
