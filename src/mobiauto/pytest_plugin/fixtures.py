@@ -469,14 +469,14 @@ def events() -> EventStore:
 
 
 @pytest.fixture(scope="function")
-def event_verifier(events: EventStore) -> EventVerifier:
+def event_verifier(events: EventStore, driver: WebDriver) -> EventVerifier:
     """
-    Provide an EventVerifier bound to the same EventStore as event_server.
+    Provide an EventVerifier bound to the same EventStore and WebDriver as event_server.
 
     This ensures that event checks are performed against the same store
     where event_server writes events.
     """
-    return EventVerifier(store=events)
+    return EventVerifier(store=events, driver=driver)
 
 
 @pytest.fixture(scope="function", autouse=True)

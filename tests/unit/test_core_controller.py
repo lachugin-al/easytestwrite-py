@@ -644,53 +644,6 @@ class TestMobileController:
         ctl.tap_offset(by_exact_match("Z"), dx=3, dy=4)
         assert ("mobile: clickGesture", {"x": 8, "y": 11}) in drv.exec_calls
 
-    def test_swipe_element_and_screen_and_scroll_until_visible(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        drv = self.DummyDrv()
-        ctl = MobileController(cast(Any, drv))
-
-        el = self.DummyEl()
-        monkeypatch.setattr(
-            "mobiauto.core.controller.Waits.wait_for_elements", lambda d, t, **kw: el
-        )
-
-        ctl.swipe_element(by_exact_match("A"), direction="down", percent=-0.5)
-        name, args = drv.exec_calls[-1]
-        percent = cast(float, args.get("percent"))
-        assert name == "mobile: swipeGesture" and percent >= 0.01
-
-        ctl.swipe_screen(direction="left", percent=2.0)
-        name, args = drv.exec_calls[-1]
-        percent2 = cast(float, args.get("percent"))
-        assert name == "mobile: swipeGesture" and percent2 <= 1.0
-        assert (
-            args["left"] == 100
-            and args["top"] == 200
-            and args["width"] == 800
-            and args["height"] == 1600
-        )
-
-        calls = {"n": 0}
-
-        def _wait_or_none(
-            driver: Any, target: Any, **kw: Any
-        ) -> TestMobileController.DummyEl | None:
-            calls["n"] += 1
-            return None if calls["n"] < 3 else el
-
-        monkeypatch.setattr(
-            "mobiauto.core.controller.Waits.wait_for_element_or_none", _wait_or_none
-        )
-        ctl.scroll_until_visible(by_exact_match("B"), max_scrolls=5, direction="up")
-
-        calls["n"] = 0
-        monkeypatch.setattr(
-            "mobiauto.core.controller.Waits.wait_for_element_or_none", lambda d, t, **kw: None
-        )
-        with pytest.raises(RuntimeError):
-            ctl.scroll_until_visible(by_exact_match("C"), max_scrolls=2)
-
     def test_drag_and_pinch(self, monkeypatch: pytest.MonkeyPatch) -> None:
         drv = self.DummyDrv()
         ctl = MobileController(cast(Any, drv))

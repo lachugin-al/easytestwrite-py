@@ -11,7 +11,9 @@ from types import TracebackType
 from typing import Any, Literal, Protocol, assert_never
 
 import allure
+from selenium.webdriver.remote.webdriver import WebDriver
 
+from ..core.controller import MobileController
 from ..core.locators import PageElement, by_label, by_text
 from ..core.waits import (
     DEFAULT_SCROLL_CAPACITY,
@@ -363,10 +365,16 @@ class EventVerifier:
     EventVerifier: wait for events (sync/async), filter them, and attach diagnostics to Allure.
     """
 
-    def __init__(self, store: EventStore | None = None) -> None:
+    def __init__(
+        self,
+        store: EventStore | None = None,
+        driver: WebDriver | None = None,
+    ) -> None:
+
         if store is None:
             logger.warning("EventVerifier created without shared EventStore - using isolated store")
         self.store = store or EventStore()
+        self._driver: WebDriver | None = driver
         self._threads: list[threading.Thread] = []
         self._thread_results: list[bool] = []
         self._lock = threading.Lock()
@@ -750,9 +758,6 @@ class EventVerifier:
         scroll_capacity: float = DEFAULT_SCROLL_CAPACITY,
         scroll_direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
         event_position: Literal["first", "last"] = "first",
-        controller: Any | None = None,
-        driver: Any | None = None,
-        scroll_fn: Callable[[], None] | None = None,
         consume: bool = True,
     ) -> PageElement:
         """
@@ -771,9 +776,6 @@ class EventVerifier:
             scroll_capacity: scroll gesture size (0..1 of the screen).
             scroll_direction: scroll direction.
             event_position: "first" or "last" matching event to use.
-            controller: optional MobileController to perform scroll via swipe_screen.
-            driver: optional WebDriver to perform low-level scrollGesture.
-            scroll_fn: optional custom scroll callback; has highest priority.
             consume: mark the selected event as consumed.
 
         Returns:
@@ -795,34 +797,6 @@ class EventVerifier:
 
         max_attempts = max(0, int(scroll_count)) + 1
         attempt = 0
-
-        def _do_scroll() -> None:
-            try:
-                if scroll_fn is not None:
-                    scroll_fn()
-                    return
-                if controller is not None:
-                    controller.swipe_screen(direction=scroll_direction, percent=scroll_capacity)
-                    return
-                if driver is not None:
-                    try:
-                        from ..core.waits import _perform_scroll as __perform_scroll
-                    except Exception:
-                        __perform_scroll = None  # type: ignore[assignment]
-                    if __perform_scroll is not None:
-                        __perform_scroll(
-                            driver,
-                            count=1,
-                            capacity=scroll_capacity,
-                            direction=scroll_direction,
-                        )
-                        return
-                logger.info(
-                    "scroll_skipped",
-                    reason="no controller/driver/scroll_fn provided",
-                )
-            except Exception as e:
-                logger.info("scroll_failed", error=str(e))
 
         while attempt < max_attempts:
             try:
@@ -860,7 +834,21 @@ class EventVerifier:
                             attempt=attempt + 1,
                             max_attempts=max_attempts,
                         )
-                        _do_scroll()
+                        if self._driver is not None:
+                            controller = MobileController(
+                                self._driver,
+                                ReportManager.get_default(),
+                            )
+                            controller.perform_scroll(
+                                count=1,
+                                capacity=scroll_capacity,
+                                direction=scroll_direction,
+                            )
+                        else:
+                            logger.warning(
+                                "page_element_matched_event: driver not initialized, skip perform_scroll",
+                                filter=expected_json_str,
+                            )
                         attempt += 1
                         continue
                     raise LookupError(
@@ -953,7 +941,22 @@ class EventVerifier:
                         attempt=attempt + 1,
                         max_attempts=max_attempts,
                     )
-                    _do_scroll()
+                    if self._driver is not None:
+                        controller = MobileController(
+                            self._driver,
+                            ReportManager.get_default(),
+                        )
+                        controller.perform_scroll(
+                            count=1,
+                            capacity=scroll_capacity,
+                            direction=scroll_direction,
+                        )
+                    else:
+                        logger.warning(
+                            "page_element_matched_event: driver not initialized, skip perform_scroll",
+                            filter=expected_json_str,
+                            error=str(t),
+                        )
                     attempt += 1
                     continue
                 raise LookupError(

@@ -20,7 +20,7 @@ DEFAULT_TIMEOUT_EXPECTATION = 5
 DEFAULT_TIMEOUT_EVENT_EXPECTATION = 10
 DEFAULT_POLLING_INTERVAL_MS = 500
 DEFAULT_SCROLL_COUNT = 0
-DEFAULT_SCROLL_CAPACITY = 0.7  # Value in range 0..1
+DEFAULT_SCROLL_CAPACITY = 1.0  # Value in range 0..1
 DEFAULT_SCROLL_DIRECTION: Literal["up", "down", "left", "right"] = "down"
 
 _log = get_logger(__name__)
@@ -92,6 +92,11 @@ class Waits:
 
                 wait = WebDriverWait(driver, timeout, poll_frequency=polling_ms / 1000.0)
 
+                # Initialize the controller once for potential scroll actions
+                from .controller import MobileController
+
+                controller = MobileController(driver, ReportManager.get_default())
+
                 current_scroll = 0
                 while True:
                     tuples: list[StrategyValue] = resolve_to_selenium(driver, target)
@@ -126,8 +131,10 @@ class Waits:
 
                     # If allowed - perform scroll and retry
                     if max_scrolls > 0 and current_scroll < max_scrolls:
-                        _perform_scroll(
-                            driver, count=1, capacity=scroll_percent, direction=scroll_direction
+                        controller.perform_scroll(
+                            count=1,
+                            capacity=scroll_percent,
+                            direction=scroll_direction,
                         )
                         current_scroll += 1
                         _log.debug(
@@ -283,49 +290,3 @@ def _wait_for_ui_stability(driver: WebDriver, timeout_seconds: float, polling_ms
             return
         previous = current
         time.sleep(max(polling_ms, 50) / 1000.0)
-
-
-def _perform_scroll(
-    driver: WebDriver,
-    count: int = 1,
-    capacity: float = DEFAULT_SCROLL_CAPACITY,
-    direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
-) -> None:
-    """
-    Perform a scroll gesture via Appium `mobile: scrollGesture` endpoint.
-
-    Args:
-        driver (WebDriver): Appium driver.
-        count (int): Number of scroll attempts.
-        capacity (float): Portion of the screen to scroll (0..1).
-        direction (Literal): Scroll direction.
-    """
-    capacity = min(max(capacity, 0.01), 1.0)
-    percent_int = int(round(capacity * 100))
-    with allure.step(f"Scroll {direction} by {percent_int}%"):
-        try:
-            size = driver.get_window_size()
-            w, h = size.get("width", 0) or 0, size.get("height", 0) or 0
-        except Exception:
-            w, h = 0, 0
-
-        left = max(int(w * 0.1), 1)
-        top = max(int(h * 0.1), 1)
-        width = max(int(w * 0.8), 1)
-        height = max(int(h * 0.8), 1)
-
-        for _ in range(max(count, 1)):
-            try:
-                driver.execute_script(
-                    "mobile: scrollGesture",
-                    {
-                        "left": left,
-                        "top": top,
-                        "width": width,
-                        "height": height,
-                        "direction": direction,
-                        "percent": capacity,
-                    },
-                )
-            except Exception:
-                pass

@@ -8,9 +8,12 @@ from typing import Any, Literal
 from urllib.parse import quote as _url_quote
 
 import allure
-from appium.webdriver.webdriver import WebDriver
 from selenium.common.exceptions import NoAlertPresentException, TimeoutException
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.common.actions.action_builder import ActionBuilder
+from selenium.webdriver.common.actions.pointer_input import PointerInput
 from selenium.webdriver.common.alert import Alert
+from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
@@ -18,16 +21,22 @@ from ..config.loader import load_settings
 from ..reporting.manager import ReportManager
 from ..utils.logging import get_logger
 from ..utils.number_parser import NumberParser
+from ..utils.platform import get_platform_from_driver
 from .locators import (
     PageElement,
     StrategyValue,
     by_accessibility_id,
     by_contains,
     by_exact_match,
-    get_platform_from_driver,
     pretty_locator,
 )
-from .waits import DEFAULT_TIMEOUT_BEFORE_EXPECTATION, DEFAULT_TIMEOUT_EXPECTATION, Waits
+from .waits import (
+    DEFAULT_SCROLL_CAPACITY,
+    DEFAULT_SCROLL_DIRECTION,
+    DEFAULT_TIMEOUT_BEFORE_EXPECTATION,
+    DEFAULT_TIMEOUT_EXPECTATION,
+    Waits,
+)
 
 
 class MobileController:
@@ -444,18 +453,68 @@ class MobileController:
                 raise
 
     # ===== Additional native gestures and system actions =====
+    def _w3c_swipe(
+        self,
+        start_x: int,
+        start_y: int,
+        end_x: int,
+        end_y: int,
+        duration_ms: int = 500,
+        steps: int = 1,
+    ) -> None:
+        """
+        Universal smooth swipe via W3C actions.
+        Instead of a single sharp movement we perform several small steps with pauses
+        so that the gesture is perceived as a "drag" rather than a "flick".
+        """
+        finger = PointerInput("touch", "finger")
+
+        actions = ActionChains(self.driver)
+        actions.w3c_actions = ActionBuilder(self.driver, mouse=finger)
+        a = actions.w3c_actions.pointer_action
+
+        start_x = int(start_x)
+        start_y = int(start_y)
+        end_x = int(end_x)
+        end_y = int(end_y)
+
+        dx = end_x - start_x
+        dy = end_y - start_y
+
+        step_dx = dx / steps
+        step_dy = dy / steps
+        step_pause = (duration_ms / 1000.0) / steps
+
+        # put finger at the starting point
+        a.move_to_location(start_x, start_y)
+        a.pointer_down()
+
+        # move finger in small steps
+        for i in range(1, steps + 1):
+            x = int(start_x + step_dx * i)
+            y = int(start_y + step_dy * i)
+            a.pause(step_pause)
+            a.move_to_location(x, y)
+
+        a.release()
+        actions.perform()
+
     def swipe_element(
         self,
         target: PageElement | StrategyValue,
         *,
         direction: Literal["up", "down", "left", "right"],
+        duration_ms: int = 500,
+        steps: int = 1,
         percent: float = 0.7,
         **params: Any,
     ) -> None:
-        """Swipe on an element in the given direction by percent (0..1)."""
+        """Swipe on the element in the given direction by percent (0..1)."""
         step_title = params.pop("step", None) or params.pop("step_title", None)
         loc = pretty_locator(self.driver, target)
         title = step_title or f"Swipe on element: {loc} ({direction}, {int(percent*100)}%)"
+        platform = (get_platform_from_driver(self.driver) or "").lower()
+
         with allure.step(title):
             self._log.info(
                 "Swipe on element",
@@ -463,20 +522,58 @@ class MobileController:
                 locator=str(loc),
                 direction=direction,
                 percent=percent,
+                platform=platform,
             )
             try:
                 el = Waits.wait_for_elements(self.driver, target, **params)
-                self.driver.execute_script(
-                    "mobile: swipeGesture",
-                    {
-                        "elementId": el.id,
-                        "direction": direction,
-                        "percent": max(0.01, min(1.0, float(percent))),
-                    },
-                )
+                percent = max(0.01, min(1.0, float(percent)))
+
+                if platform == "android":
+                    # Keep native Android gesture
+                    self.driver.execute_script(
+                        "mobile: swipeGesture",
+                        {
+                            "elementId": el.id,
+                            "direction": direction,
+                            "percent": percent,
+                        },
+                    )
+                else:
+                    # iOS (and everything else) - W3C actions
+                    rect = getattr(el, "rect", {}) or {}
+                    x = rect.get("x", 0)
+                    y = rect.get("y", 0)
+                    w = rect.get("width", 0)
+                    h = rect.get("height", 0)
+
+                    start_x = end_x = int(x + w / 2)
+                    start_y = end_y = int(y + h / 2)
+
+                    if direction == "up":
+                        start_y = int(y + h * 0.8)
+                        end_y = int(start_y - h * percent)
+                    elif direction == "down":
+                        start_y = int(y + h * 0.2)
+                        end_y = int(start_y + h * percent)
+                    elif direction == "left":
+                        start_x = int(x + w * 0.8)
+                        end_x = int(start_x - w * percent)
+                    elif direction == "right":
+                        start_x = int(x + w * 0.2)
+                        end_x = int(start_x + w * percent)
+                    else:
+                        raise ValueError(f"Unknown direction: {direction}")
+
+                    self._w3c_swipe(start_x, start_y, end_x, end_y, duration_ms, steps)
+
                 self.report_manager.attach_screenshot_if_allowed(self.driver, when="success")
             except Exception:
-                self._log.error("Swipe error", action="swipe_element", locator=str(loc))
+                self._log.error(
+                    "Swipe error",
+                    action="swipe_element",
+                    locator=str(loc),
+                    direction=direction,
+                )
                 self.report_manager.attach_artifacts_on_failure(self.driver)
                 raise
 
@@ -484,34 +581,172 @@ class MobileController:
         self,
         *,
         direction: Literal["up", "down", "left", "right"],
+        duration_ms: int = 500,
+        steps: int = 1,
         percent: float = 0.7,
         step: str | None = None,
     ) -> None:
-        """Swipe the screen in the given direction by percent (0..1)."""
-        title = step or f"Swipe screen: {direction}, {int(percent*100)}%"
+        """Swipe on the screen in the given direction by percent (0..1)."""
+        title = step or f"Swipe on screen: {direction}, {int(percent*100)}%"
+        platform = (get_platform_from_driver(self.driver) or "").lower()
+
         with allure.step(title):
             self._log.info(
-                "Swipe screen", action="swipe_screen", direction=direction, percent=percent
+                "Screen swipe",
+                action="swipe_screen",
+                direction=direction,
+                percent=percent,
+                platform=platform,
             )
             try:
                 size = self.driver.get_window_size()
                 w, h = size.get("width", 0) or 0, size.get("height", 0) or 0
-                left, top = max(int(w * 0.1), 1), max(int(h * 0.1), 1)
-                width, height = max(int(w * 0.8), 1), max(int(h * 0.8), 1)
-                self.driver.execute_script(
-                    "mobile: swipeGesture",
-                    {
-                        "left": left,
-                        "top": top,
-                        "width": width,
-                        "height": height,
-                        "direction": direction,
-                        "percent": max(0.01, min(1.0, float(percent))),
-                    },
-                )
+                percent = max(0.01, min(1.0, float(percent)))
+
+                if platform == "android":
+                    # Legacy behavior - via mobile: swipeGesture
+                    left, top = max(int(w * 0.01), 1), max(int(h * 0.01), 1)
+                    width, height = max(int(w * 0.7), 1), max(int(h * 0.7), 1)
+                    self.driver.execute_script(
+                        "mobile: swipeGesture",
+                        {
+                            "left": left,
+                            "top": top,
+                            "width": width,
+                            "height": height,
+                            "direction": direction,
+                            "percent": percent,
+                        },
+                    )
+                else:
+                    # iOS - W3C swipe
+                    center_x = int(w / 2)
+                    center_y = int(h / 2)
+
+                    start_x = end_x = center_x
+                    start_y = end_y = center_y
+
+                    if direction == "up":
+                        start_y = int(h * 0.7)
+                        end_y = int(start_y - h * percent)
+                    elif direction == "down":
+                        start_y = int(h * 0.3)
+                        end_y = int(start_y + h * percent)
+                    elif direction == "left":
+                        start_x = int(w * 0.7)
+                        end_x = int(start_x - w * percent)
+                    elif direction == "right":
+                        start_x = int(w * 0.3)
+                        end_x = int(start_x + w * percent)
+                    else:
+                        raise ValueError(f"Unknown direction: {direction}")
+
+                    self._w3c_swipe(start_x, start_y, end_x, end_y, duration_ms, steps)
+
                 self.report_manager.attach_screenshot_if_allowed(self.driver, when="success")
             except Exception:
-                self._log.error("Screen swipe error", action="swipe_screen", direction=direction)
+                self._log.error(
+                    "Screen swipe error",
+                    action="swipe_screen",
+                    direction=direction,
+                    platform=platform,
+                )
+                self.report_manager.attach_artifacts_on_failure(self.driver)
+                raise
+
+    def perform_scroll(
+        self,
+        count: int = 1,
+        capacity: float = DEFAULT_SCROLL_CAPACITY,
+        direction: Literal["up", "down", "left", "right"] = DEFAULT_SCROLL_DIRECTION,
+        duration_ms: int = 1500,
+        *,
+        step: str | None = None,
+    ) -> None:
+        """Perform a full-screen scroll gesture."""
+
+        capacity = min(max(capacity, 0.01), 1.0)
+        percent_int = int(round(capacity * 100))
+        title = step or f"Scroll {direction} by {percent_int}%"
+        platform = (get_platform_from_driver(self.driver) or "").lower()
+
+        with allure.step(title):
+            self._log.info(
+                "Screen scroll",
+                action="perform_scroll",
+                direction=direction,
+                capacity=capacity,
+                count=count,
+                platform=platform,
+            )
+            try:
+                try:
+                    size = self.driver.get_window_size()
+                    w, h = size.get("width", 0) or 0, size.get("height", 0) or 0
+                except Exception:
+                    w, h = 0, 0
+
+                left = max(int(w * 0.01), 1)
+                top = max(int(h * 0.01), 1)
+                width = max(int(w * 0.7), 1)
+                height = max(int(h * 0.7), 1)
+
+                # for iOS - invert the direction, because swipe_screen operates
+                # on the gesture direction, not the logical "screen scrolling"
+                if platform == "ios":
+                    invert = {
+                        "up": "down",
+                        "down": "up",
+                        "left": "right",
+                        "right": "left",
+                    }
+
+                    inv = invert.get(direction, direction)
+
+                    if inv not in ("up", "down", "left", "right"):
+                        raise ValueError(f"Invalid inverted direction: {inv}")
+
+                    ios_swipe_direction: Literal["up", "down", "left", "right"] = inv  # type: ignore
+
+                for _ in range(max(int(count), 1)):
+                    if platform == "android":
+                        # Android: keep mobile: scrollGesture with "logical" direction
+                        try:
+                            self.driver.execute_script(
+                                "mobile: scrollGesture",
+                                {
+                                    "left": left,
+                                    "top": top,
+                                    "width": width,
+                                    "height": height,
+                                    "direction": direction,
+                                    "percent": capacity,
+                                },
+                            )
+                        except Exception:
+                            # swallow single gesture errors
+                            pass
+                    else:
+                        # iOS: W3C swipe in gesture direction (inversion of logical direction)
+                        try:
+                            # how many steps to do per gesture
+                            # 10–20 steps are usually enough for smoothness
+                            steps = max(5, min(25, duration_ms // 40))  # ~40ms per step
+                            self.swipe_screen(
+                                direction=ios_swipe_direction, steps=steps, percent=capacity
+                            )
+                        except Exception:
+                            pass
+
+                self.report_manager.attach_screenshot_if_allowed(self.driver, when="success")
+            except Exception:
+                self._log.error(
+                    "Error while performing scroll",
+                    action="perform_scroll",
+                    direction=direction,
+                    capacity=capacity,
+                    platform=platform,
+                )
                 self.report_manager.attach_artifacts_on_failure(self.driver)
                 raise
 
@@ -524,10 +759,16 @@ class MobileController:
         percent: float = 0.7,
         **params: Any,
     ) -> None:
-        """Scroll the screen until the element becomes visible or attempts are exhausted."""
+        """Scroll the screen until the element becomes visible, or we exhaust attempts.
+
+        Uses perform_scroll, which already contains platform-specific logic inside
+        (Android - via mobile: scrollGesture, iOS - via W3C swipe).
+        """
         step_title = params.pop("step", None) or params.pop("step_title", None)
         loc = pretty_locator(self.driver, target)
         title = step_title or f"Scroll to element: {loc} (≤{max_scrolls} times)"
+        percent = max(0.01, min(1.0, float(percent)))
+
         with allure.step(title):
             self._log.info(
                 "Scroll until visible",
@@ -535,6 +776,7 @@ class MobileController:
                 locator=str(loc),
                 direction=direction,
                 max_scrolls=max_scrolls,
+                percent=percent,
             )
             try:
                 for _ in range(max(1, int(max_scrolls))):
@@ -544,28 +786,25 @@ class MobileController:
                             self.driver, when="success"
                         )
                         return
-                    # Scroll a screen area
-                    size = self.driver.get_window_size()
-                    w, h = size.get("width", 0) or 0, size.get("height", 0) or 0
-                    left, top = max(int(w * 0.1), 1), max(int(h * 0.1), 1)
-                    width, height = max(int(w * 0.8), 1), max(int(h * 0.8), 1)
-                    self.driver.execute_script(
-                        "mobile: scrollGesture",
-                        {
-                            "left": left,
-                            "top": top,
-                            "width": width,
-                            "height": height,
-                            "direction": direction,
-                            "percent": max(0.01, min(1.0, float(percent))),
-                        },
+
+                    # Scroll the screen by the specified percent in the desired direction
+                    self.perform_scroll(
+                        count=1,
+                        capacity=percent,
+                        direction=direction,
                     )
+
+                # If the element still did not appear
                 raise RuntimeError(
                     f"Element did not become visible after {max_scrolls} scrolls: {loc}"
                 )
             except Exception:
                 self._log.error(
-                    "Failed to scroll to element", action="scroll_until_visible", locator=str(loc)
+                    "Failed to scroll to element",
+                    action="scroll_until_visible",
+                    locator=str(loc),
+                    direction=direction,
+                    max_scrolls=max_scrolls,
                 )
                 self.report_manager.attach_artifacts_on_failure(self.driver)
                 raise
@@ -654,7 +893,10 @@ class MobileController:
         with allure.step(title):
             self._log.info("Hide keyboard", action="hide_keyboard")
             try:
-                self.driver.hide_keyboard()
+                hide_fn = getattr(self.driver, "hide_keyboard", None)
+                if not callable(hide_fn):
+                    raise RuntimeError("Method hide_keyboard not implemented in this driver")
+                hide_fn()
             except Exception:
                 # Not always critical, but artifacts may help
                 self.report_manager.attach_artifacts_on_failure(self.driver)
