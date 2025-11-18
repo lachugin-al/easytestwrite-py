@@ -60,6 +60,32 @@ class MobileController:
         self.driver = driver
         self.report_manager = report_manager or ReportManager.get_default()
         self._log = get_logger(__name__)
+        # Cache for last-detected platform (primarily for logging).
+        # Actual value is always derived from get_platform_from_driver to allow
+        # tests to monkeypatch platform detection on the fly.
+        self._platform: str | None = None
+
+    @property
+    def platform(self) -> str:
+        """Return a lowercase platform name derived from the driver.
+
+        The value is obtained via get_platform_from_driver on every access,
+        then cached in _platform for logging/diagnostics. This makes the
+        controller responsive to monkeypatching get_platform_from_driver in
+        tests while still keeping a convenient cached representation.
+        """
+
+        detected = (get_platform_from_driver(self.driver) or "").lower()
+        self._platform = detected
+        return detected
+
+    @property
+    def is_ios(self) -> bool:
+        return self.platform == "ios"
+
+    @property
+    def is_android(self) -> bool:
+        return self.platform == "android"
 
     # ====== System alerts handling ======
     def _wait_for_alert(self, timeout: float = DEFAULT_TIMEOUT_EXPECTATION) -> Alert:
@@ -513,7 +539,6 @@ class MobileController:
         step_title = params.pop("step", None) or params.pop("step_title", None)
         loc = pretty_locator(self.driver, target)
         title = step_title or f"Swipe on element: {loc} ({direction}, {int(percent*100)}%)"
-        platform = (get_platform_from_driver(self.driver) or "").lower()
 
         with allure.step(title):
             self._log.info(
@@ -522,13 +547,13 @@ class MobileController:
                 locator=str(loc),
                 direction=direction,
                 percent=percent,
-                platform=platform,
+                platform=self._platform,
             )
             try:
                 el = Waits.wait_for_elements(self.driver, target, **params)
                 percent = max(0.01, min(1.0, float(percent)))
 
-                if platform == "android":
+                if self.is_android:
                     # Keep native Android gesture
                     self.driver.execute_script(
                         "mobile: swipeGesture",
@@ -588,7 +613,6 @@ class MobileController:
     ) -> None:
         """Swipe on the screen in the given direction by percent (0..1)."""
         title = step or f"Swipe on screen: {direction}, {int(percent*100)}%"
-        platform = (get_platform_from_driver(self.driver) or "").lower()
 
         with allure.step(title):
             self._log.info(
@@ -596,14 +620,14 @@ class MobileController:
                 action="swipe_screen",
                 direction=direction,
                 percent=percent,
-                platform=platform,
+                platform=self._platform,
             )
             try:
                 size = self.driver.get_window_size()
                 w, h = size.get("width", 0) or 0, size.get("height", 0) or 0
                 percent = max(0.01, min(1.0, float(percent)))
 
-                if platform == "android":
+                if self.is_android:
                     # Legacy behavior - via mobile: swipeGesture
                     left, top = max(int(w * 0.01), 1), max(int(h * 0.01), 1)
                     width, height = max(int(w * 0.7), 1), max(int(h * 0.7), 1)
@@ -649,7 +673,7 @@ class MobileController:
                     "Screen swipe error",
                     action="swipe_screen",
                     direction=direction,
-                    platform=platform,
+                    platform=self.platform,
                 )
                 self.report_manager.attach_artifacts_on_failure(self.driver)
                 raise
@@ -668,7 +692,6 @@ class MobileController:
         capacity = min(max(capacity, 0.01), 1.0)
         percent_int = int(round(capacity * 100))
         title = step or f"Scroll {direction} by {percent_int}%"
-        platform = (get_platform_from_driver(self.driver) or "").lower()
 
         with allure.step(title):
             self._log.info(
@@ -677,7 +700,7 @@ class MobileController:
                 direction=direction,
                 capacity=capacity,
                 count=count,
-                platform=platform,
+                platform=self._platform,
             )
             try:
                 try:
@@ -693,7 +716,7 @@ class MobileController:
 
                 # for iOS - invert the direction, because swipe_screen operates
                 # on the gesture direction, not the logical "screen scrolling"
-                if platform == "ios":
+                if self.is_ios:
                     invert = {
                         "up": "down",
                         "down": "up",
@@ -709,7 +732,7 @@ class MobileController:
                     ios_swipe_direction: Literal["up", "down", "left", "right"] = inv  # type: ignore
 
                 for _ in range(max(int(count), 1)):
-                    if platform == "android":
+                    if self.is_android:
                         # Android: keep mobile: scrollGesture with "logical" direction
                         try:
                             self.driver.execute_script(
@@ -745,7 +768,7 @@ class MobileController:
                     action="perform_scroll",
                     direction=direction,
                     capacity=capacity,
-                    platform=platform,
+                    platform=self._platform,
                 )
                 self.report_manager.attach_artifacts_on_failure(self.driver)
                 raise
@@ -962,18 +985,17 @@ class MobileController:
             ValueError: if the required parameter for the platform is not provided.
             RuntimeError: if called for an unsupported platform or the driver is not initialized.
         """
-        platform = (get_platform_from_driver(self.driver) or "").lower()
         title = step or "Send native command"
         with allure.step(title):
             self._log.info(
                 "Native action",
                 action="perform_native_action",
-                platform=platform,
+                platform=self._platform,
                 android_key=android_key,
                 ios_key=ios_key,
             )
             try:
-                if platform == "android":
+                if self.is_android:
                     if android_key is None:
                         raise ValueError(
                             "Parameter android_key is required for the Android platform"
@@ -983,7 +1005,7 @@ class MobileController:
                     self.report_manager.attach_screenshot_if_allowed(self.driver, when="success")
                     return
 
-                if platform == "ios":
+                if self.is_ios:
                     if ios_key is None:
                         raise ValueError("Parameter ios_key is required for the iOS platform")
                     # Try via mobile: type (recommended way for iOS)
@@ -1328,13 +1350,14 @@ class MobileController:
          - On error/absence of bundleId - fallback via simulator: `xcrun simctl openurl` to a local
            page that contains a link with id=deeplink.
         """
-        platform = (get_platform_from_driver(self.driver) or "").lower()
         settings = load_settings()
 
         with allure.step(f"Open deeplink: {deeplink}"):
-            self._log.info("Open deeplink", action="open_deeplink", platform=platform, url=deeplink)
+            self._log.info(
+                "Open deeplink", action="open_deeplink", platform=self._platform, url=deeplink
+            )
             try:
-                if platform == "android":
+                if self.is_android:
                     app_package: str | None = getattr(
                         getattr(settings, "android", None), "app_package", None
                     )
@@ -1346,7 +1369,7 @@ class MobileController:
                     self.report_manager.attach_screenshot_if_allowed(self.driver, when="success")
                     return
 
-                if platform == "ios":
+                if self.is_ios:
                     bundle_id: str = (
                         getattr(getattr(settings, "ios", None), "bundle_id", None) or ""
                     ).strip()
@@ -1363,7 +1386,7 @@ class MobileController:
                             self._log.warning(
                                 f"iOS deepLink via Appium failed, falling back to simulator: {e}",
                                 action="open_deeplink",
-                                platform=platform,
+                                platform=self._platform,
                             )
                     # Fallback via simulator
                     self._ios_deeplink_via_simulator(deeplink, settings)
