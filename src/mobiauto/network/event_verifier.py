@@ -17,7 +17,7 @@ from ..core.waits import (
     DEFAULT_SCROLL_CAPACITY,
     DEFAULT_SCROLL_COUNT,
     DEFAULT_SCROLL_DIRECTION,
-    DEFAULT_TIMEOUT_EXPECTATION,
+    DEFAULT_TIMEOUT_EVENT_EXPECTATION,
 )
 from ..reporting.manager import (  # noqa: F401  # reserved for future (artifacts/policies)
     ReportManager,
@@ -560,7 +560,7 @@ class EventVerifier:
     def check_has_event(
         self,
         event_data: str | dict[str, Any] | None = None,
-        timeout_sec: float = DEFAULT_TIMEOUT_EXPECTATION,
+        timeout_sec: float = DEFAULT_TIMEOUT_EVENT_EXPECTATION,
         *,
         polling_interval: float = 0.5,
         soft: bool = False,
@@ -711,7 +711,7 @@ class EventVerifier:
     def check_has_event_async(
         self,
         event_data: str | dict[str, Any] | None = None,
-        timeout_sec: float = DEFAULT_TIMEOUT_EXPECTATION,
+        timeout_sec: float = DEFAULT_TIMEOUT_EVENT_EXPECTATION,
         *,
         polling_interval: float = 0.5,
         consume: bool = True,
@@ -744,7 +744,7 @@ class EventVerifier:
     def page_element_matched_event(
         self,
         event_data: str | dict[str, Any],
-        timeout_event_expectation: float = DEFAULT_TIMEOUT_EXPECTATION,
+        timeout_event_expectation: float = DEFAULT_TIMEOUT_EVENT_EXPECTATION,
         *,
         scroll_count: int = DEFAULT_SCROLL_COUNT,
         scroll_capacity: float = DEFAULT_SCROLL_CAPACITY,
